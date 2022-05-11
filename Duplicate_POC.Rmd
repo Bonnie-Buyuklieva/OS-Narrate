@@ -1,0 +1,150 @@
+---
+title: "Duplicate (strings) EPCs in V10"
+author: "Boyana Buyuklieva"
+date: "May 4, 2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readr)
+library(dplyr)
+```
+
+
+
+```{r}
+#get folders
+folders <- list.files(path = "../Data/all-domestic-certificates", pattern = NULL, all.files = FALSE,
+           full.names = FALSE, recursive = FALSE,
+           ignore.case = FALSE, include.dirs = FALSE, no.. = FALSE)
+
+folders <- folders[-342] #remove the .txt
+str_dups <- data.frame()
+
+```
+
+
+
+
+
+```{r}
+#get dups
+test <- folders[2]
+certificates <- read_csv(paste0("../Data/all-domestic-certificates/",test,"/certificates.csv"))
+
+certificates$combined <- paste0(certificates$ADDRESS, certificates$POSTCODE)
+
+
+tmpdups <- certificates[duplicated(certificates$combined) | duplicated(certificates$combined, fromLast = TRUE),]
+tmpdups$folder <- test
+
+str_dups <- rbind(str_dups,tmpdups)
+str_dups <- str_dups[order(str_dups$combined, str_dups$INSPECTION_DATE),]
+```
+
+
+[Information on how the Energy Rating map to Energy Efficiency](https://www.edfenergy.com/energy-efficiency/how-improve-your-epc-rating)
+
+
+```{r}
+#detecting an improvement
+## this can be based on the 'CURRENT_ENERGY_RATING': "E" "B" "C" "D" "F" "G" "A"
+## or 'CURRENT_ENERGY_EFFICIENCY'
+#### NOTES: 'POTENTIAL_ENERGY_RATING','POTENTIAL_ENERGY_EFFICIENCY'
+
+c <- c('combined','INSPECTION_DATE','firstEntry','n_delta')
+
+tmp <- head(str_dups,25)
+
+
+#get the first entry
+firstEntry <-which(!duplicated(tmp$combined))
+tmp$firstEntry <- F
+tmp$firstEntry[firstEntry] <- T
+
+
+
+
+#set up the time column, relative to Inspection Date
+tmp$n_deltaDays <-  as.POSIXct(tmp$INSPECTION_DATE, format = "%m-%d-%Y") 
+tmp$n_deltaDays <- ifelse( tmp$firstEntry == T, 
+                       0 , 
+                       as.numeric(tmp$INSPECTION_DATE, tmp$n_delta) )  
+
+
+#Delta(ER)
+#might cause problems without trimming white spaces and caps
+tmp$n_dER <- factor(tmp$CURRENT_ENERGY_RATING, 
+                       ordered = T, levels = c('A','B','C','D','E','F'))
+tmp$n_dEE <- tmp$CURRENT_ENERGY_EFFICIENCY
+
+
+
+dupcol <- 'combined'
+for (entry in unique(tmp[,dupcol])) {
+  
+  #get a case of duplicates
+  tmp_entries <- subset(tmp, tmp[,dupcol] == entry)
+  tmp_entries$test <- 0
+  
+  
+  
+  for (row in lengths(tmp_entries)[1]){
+    
+  #for all duplicate entries
+  if(tmp_entries$firstEntry == T){
+    
+    #get the key in the big table
+    LMK <- which(tmp$LMK_KEY  == tmp_entries$LMK_KEY [row]) 
+  
+    
+    tmp_entries$test[row]<- tmp_entries$CURRENT_ENERGY_RATING[row]
+
+    }else{
+      #PROBLEM - SUBTRACTING FACTORS HERE:
+      ##tmp$CURRENT_ENERGY_RATING[tmp_entries[row]$LMK_KEY] <- 
+      #print(tmp_entries$CURRENT_ENERGY_RATING[1] - tmp_entries$CURRENT_ENERGY_RATING[row]) # 1 is the first entry of dups
+      
+    
+     tmp_entries$n_dEE <- tmp_entries$CURRENT_ENERGY_EFFICIENCY[1] - tmp_entries$CURRENT_ENERGY_EFFICIENCY[row]
+      
+    }
+  }
+}
+
+
+#as.numeric(tmp$n_dER[-1]) - as.numeric(tmp$n_dER[7])
+tmp$n_dER <-ifelse( tmp$firstEntry == T, 
+                       tmp$n_dER , 
+                       as.numeric(tmp$n_dER[-1]) - as.numeric(tmp$n_dER[7]) ) 
+
+tmp$n_dER
+
+
+#select the duplicates
+#sort by date
+#see if any changes in 
+#* EE () } up, down, else
+#* EC
+
+
+as.Date(as.character(time),format="%Y%m%d")
+
+dups <- certificates[duplicated(certificates$combined) | duplicated(certificates$combined, fromLast = TRUE),]
+
+
+
+#there are 109 obs, with Inspection_date between 2019-21,duplicates have the same date 
+View((certificates$combined[ duplicated(certificates$combined)]))
+
+
+
+library(dplyr)
+df %>%
+  group_by(Gene) %>%
+  summarise_all(sum) %>%
+  data.frame() -> newdf # so that newdf can further be used, if needed
+
+```
+
