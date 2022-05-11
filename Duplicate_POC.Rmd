@@ -75,8 +75,8 @@ tmp$n_deltaDays <- ifelse( tmp$firstEntry == T,
 
 #Delta(ER)
 #might cause problems without trimming white spaces and caps
-tmp$n_dER <- factor(tmp$CURRENT_ENERGY_RATING, 
-                       ordered = T, levels = c('A','B','C','D','E','F'))
+tmp$n_dER <- as.numeric(factor(tmp$CURRENT_ENERGY_RATING, 
+                       ordered = T, levels = c('A','B','C','D','E','F')))
 tmp$n_dEE <- tmp$CURRENT_ENERGY_EFFICIENCY
 
 
@@ -86,30 +86,17 @@ for (entry in unique(tmp[,dupcol])) {
   
   #get a case of duplicates
   tmp_entries <- subset(tmp, tmp[,dupcol] == entry)
-  tmp_entries$test <- 0
+  tmp_LMKs <- unique(tmp_entries$LMK_KEY)
   
   
-  
-  for (row in lengths(tmp_entries)[1]){
+  for (row in length(tmp_LMKs)){
+  if(row > 1){ #row one is always the first entry
+    tmp_entries$n_dER[row] <- tmp_entries$n_dER[1] - tmp_entries$n_dER[row] # factor as numbers
+    tmp_entries$n_dEE[row] <- tmp_entries$CURRENT_ENERGY_EFFICIENCY[row] -tmp_entries$CURRENT_ENERGY_EFFICIENCY[1]
+  }
     
-  #for all duplicate entries
-  if(tmp_entries$firstEntry == T){
-    
-    #get the key in the big table
-    LMK <- which(tmp$LMK_KEY  == tmp_entries$LMK_KEY [row]) 
-  
-    
-    tmp_entries$test[row]<- tmp_entries$CURRENT_ENERGY_RATING[row]
-
-    }else{
-      #PROBLEM - SUBTRACTING FACTORS HERE:
-      ##tmp$CURRENT_ENERGY_RATING[tmp_entries[row]$LMK_KEY] <- 
-      #print(tmp_entries$CURRENT_ENERGY_RATING[1] - tmp_entries$CURRENT_ENERGY_RATING[row]) # 1 is the first entry of dups
-      
-    
-     tmp_entries$n_dEE <- tmp_entries$CURRENT_ENERGY_EFFICIENCY[1] - tmp_entries$CURRENT_ENERGY_EFFICIENCY[row]
-      
-    }
+    #tmp$n_dER[which(tmp$LMK_KEY %in% tmp_LMKs[row])]
+    #tmp$n_dEE[which(tmp$LMK_KEY %in% tmp_LMKs[row])]
   }
 }
 
