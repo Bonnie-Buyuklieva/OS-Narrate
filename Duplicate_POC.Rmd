@@ -8,7 +8,7 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(readr)
-library(dplyr)
+#library(dplyr)
 ```
 
 
@@ -22,6 +22,27 @@ folders <- list.files(path = "../Data/all-domestic-certificates", pattern = NULL
 folders <- folders[-342] #remove the .txt
 str_dups <- data.frame()
 
+#Here might be a place to get difference by LAD, eg.g: 
+## % of one of entries by folder.
+## Median CURRENT_ENERGY_RATING
+## Mean, SD of (CURRENT - POTENTIAL_ENERGY_EFFICIENCY) 
+######or (ENVIROMENT_IMPACT_CURRENT - POTENTIAL)
+######or any other more specific: e.g. C02 emission, lighting, heating, hotwater,
+## Proportion of PROPERTY_TYPE and/or BUILT_FORM and/or Transaction_Type and/or CONSTRUCTION_AGE_BAND and/or TENURE
+## Min, Max, Mean, SD of INSPECTION DATE and/or Lodgementdate
+
+folders_meta <- data.frame(names = folders)
+folders_meta$name <- folders
+
+
+
+for (f in folders) {
+  
+  
+  
+}
+
+
 ```
 
 
@@ -30,14 +51,14 @@ str_dups <- data.frame()
 
 ```{r}
 #get dups
-test <- folders[2]
+LA <- folders[2]
 certificates <- read_csv(paste0("../Data/all-domestic-certificates/",test,"/certificates.csv"))
 
 certificates$combined <- paste0(certificates$ADDRESS, certificates$POSTCODE)
 
 
 tmpdups <- certificates[duplicated(certificates$combined) | duplicated(certificates$combined, fromLast = TRUE),]
-tmpdups$folder <- test
+tmpdups$folder <- LA
 
 str_dups <- rbind(str_dups,tmpdups)
 str_dups <- str_dups[order(str_dups$combined, str_dups$INSPECTION_DATE),]
@@ -95,43 +116,9 @@ for (entry in unique(tmp[,dupcol])) {
     tmp_entries$n_dEE[row] <- tmp_entries$CURRENT_ENERGY_EFFICIENCY[row] -tmp_entries$CURRENT_ENERGY_EFFICIENCY[1]
   }
     
-    #tmp$n_dER[which(tmp$LMK_KEY %in% tmp_LMKs[row])]
-    #tmp$n_dEE[which(tmp$LMK_KEY %in% tmp_LMKs[row])]
+    #tmp$n_dER[which(tmp$LMK_KEY %in% tmp_LMKs[row])] <- tmp_entries$n_dER[row]
+    #tmp$n_dEE[which(tmp$LMK_KEY %in% tmp_LMKs[row])] <- tmp_entries$n_dEE[row]
   }
 }
-
-
-#as.numeric(tmp$n_dER[-1]) - as.numeric(tmp$n_dER[7])
-tmp$n_dER <-ifelse( tmp$firstEntry == T, 
-                       tmp$n_dER , 
-                       as.numeric(tmp$n_dER[-1]) - as.numeric(tmp$n_dER[7]) ) 
-
-tmp$n_dER
-
-
-#select the duplicates
-#sort by date
-#see if any changes in 
-#* EE () } up, down, else
-#* EC
-
-
-as.Date(as.character(time),format="%Y%m%d")
-
-dups <- certificates[duplicated(certificates$combined) | duplicated(certificates$combined, fromLast = TRUE),]
-
-
-
-#there are 109 obs, with Inspection_date between 2019-21,duplicates have the same date 
-View((certificates$combined[ duplicated(certificates$combined)]))
-
-
-
-library(dplyr)
-df %>%
-  group_by(Gene) %>%
-  summarise_all(sum) %>%
-  data.frame() -> newdf # so that newdf can further be used, if needed
-
 ```
 
