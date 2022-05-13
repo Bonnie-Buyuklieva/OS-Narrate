@@ -7,66 +7,25 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-library(readr)
-#library(dplyr)
-```
-
-
-
-```{r}
-#get folders
-folders <- list.files(path = "../Data/all-domestic-certificates", pattern = NULL, all.files = FALSE,
-           full.names = FALSE, recursive = FALSE,
-           ignore.case = FALSE, include.dirs = FALSE, no.. = FALSE)
-
-folders <- folders[-342] #remove the .txt
-str_dups <- data.frame()
-
-#Here might be a place to get difference by LAD, eg.g: 
-## % of one of entries by folder.
-## Median CURRENT_ENERGY_RATING
-## Mean, SD of (CURRENT - POTENTIAL_ENERGY_EFFICIENCY) 
-######or (ENVIROMENT_IMPACT_CURRENT - POTENTIAL)
-######or any other more specific: e.g. C02 emission, lighting, heating, hotwater,
-## Proportion of PROPERTY_TYPE and/or BUILT_FORM and/or Transaction_Type and/or CONSTRUCTION_AGE_BAND and/or TENURE
-## Min, Max, Mean, SD of INSPECTION DATE and/or Lodgementdate
-
-folders_meta <- data.frame(names = folders)
-folders_meta$name <- folders
-
-
-
-for (f in folders) {
-  
-  
-  
-}
-
-
-```
-
-
-
-
-
-```{r}
-#get dups
-LA <- folders[2]
-certificates <- read_csv(paste0("../Data/all-domestic-certificates/",test,"/certificates.csv"))
-
-certificates$combined <- paste0(certificates$ADDRESS, certificates$POSTCODE)
-
-
-tmpdups <- certificates[duplicated(certificates$combined) | duplicated(certificates$combined, fromLast = TRUE),]
-tmpdups$folder <- LA
-
-str_dups <- rbind(str_dups,tmpdups)
-str_dups <- str_dups[order(str_dups$combined, str_dups$INSPECTION_DATE),]
+str_dups$test <- 0
+load(file = '/MetaData&StringDups.RData'))
 ```
 
 
 [Information on how the Energy Rating map to Energy Efficiency](https://www.edfenergy.com/energy-efficiency/how-improve-your-epc-rating)
 
+```{r}
+#Df of all rows that repeat
+tmp <- str_dups
+  
+#flag fist entries   
+tmp$firstEntry <- F
+tmp$firstEntry[firstEntry] <- T
+
+
+
+
+```
 
 ```{r}
 #detecting an improvement
@@ -90,8 +49,7 @@ tmp$firstEntry[firstEntry] <- T
 #set up the time column, relative to Inspection Date
 tmp$n_deltaDays <-  as.POSIXct(tmp$INSPECTION_DATE, format = "%m-%d-%Y") 
 tmp$n_deltaDays <- ifelse( tmp$firstEntry == T, 
-                       0 , 
-                       as.numeric(tmp$INSPECTION_DATE, tmp$n_delta) )  
+                       0 , as.numeric(tmp$INSPECTION_DATE, tmp$n_delta) )  
 
 
 #Delta(ER)
