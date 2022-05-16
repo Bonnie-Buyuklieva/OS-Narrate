@@ -1,14 +1,13 @@
 ---
 title: "Duplicate (strings) EPCs in V10"
 author: "Boyana Buyuklieva"
-date: "May 4, 2022"
+date: "May 12, 2022"
 output: html_document
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-str_dups$test <- 0
-load(file = '/MetaData&StringDups.RData'))
+load(file = './MetaData&StringDups.RData')
 ```
 
 
@@ -20,49 +19,27 @@ tmp <- str_dups
   
 #flag fist entries   
 tmp$firstEntry <- F
-tmp$firstEntry[firstEntry] <- T
-
-
-
-
-```
-
-```{r}
-#detecting an improvement
-## this can be based on the 'CURRENT_ENERGY_RATING': "E" "B" "C" "D" "F" "G" "A"
-## or 'CURRENT_ENERGY_EFFICIENCY'
-#### NOTES: 'POTENTIAL_ENERGY_RATING','POTENTIAL_ENERGY_EFFICIENCY'
-
-c <- c('combined','INSPECTION_DATE','firstEntry','n_delta')
-
-tmp <- head(str_dups,25)
-
-
-#get the first entry
-firstEntry <-which(!duplicated(tmp$combined))
-tmp$firstEntry <- F
-tmp$firstEntry[firstEntry] <- T
-
-
+firstEntry <-which(!duplicated(tmp$combined)) #3539058
+tmp$firstEntry[firstEntry] <- T 
+rm(firstEntry)
 
 
 #set up the time column, relative to Inspection Date
-tmp$n_deltaDays <-  as.POSIXct(tmp$INSPECTION_DATE, format = "%m-%d-%Y") 
-tmp$n_deltaDays <- ifelse( tmp$firstEntry == T, 
-                       0 , as.numeric(tmp$INSPECTION_DATE, tmp$n_delta) )  
-
+tmp$n_deltaDays <-  0
 
 #Delta(ER)
 #might cause problems without trimming white spaces and caps
 tmp$n_dER <- as.numeric(factor(tmp$CURRENT_ENERGY_RATING, 
                        ordered = T, levels = c('A','B','C','D','E','F')))
 tmp$n_dEE <- tmp$CURRENT_ENERGY_EFFICIENCY
+```
 
 
 
+```{r}
 dupcol <- 'combined'
 for (entry in unique(tmp[,dupcol])) {
-  
+  print(which(entry == unique(tmp[,dupcol])))
   #get a case of duplicates
   tmp_entries <- subset(tmp, tmp[,dupcol] == entry)
   tmp_LMKs <- unique(tmp_entries$LMK_KEY)
@@ -70,13 +47,19 @@ for (entry in unique(tmp[,dupcol])) {
   
   for (row in length(tmp_LMKs)){
   if(row > 1){ #row one is always the first entry
-    tmp_entries$n_dER[row] <- tmp_entries$n_dER[1] - tmp_entries$n_dER[row] # factor as numbers
-    tmp_entries$n_dEE[row] <- tmp_entries$CURRENT_ENERGY_EFFICIENCY[row] -tmp_entries$CURRENT_ENERGY_EFFICIENCY[1]
-  }
+    # tmp_entries$n_dER[row] <- tmp_entries$n_dER[1] - tmp_entries$n_dER[row] # factor as numbers
+    # tmp_entries$n_dER[row] <- tmp_entries$CURRENT_ENERGY_EFFICIENCY[row] -tmp_entries$CURRENT_ENERGY_EFFICIENCY[1]
+    # tmp_entries$n_deltaDays[row] <- as.numeric(difftime(tmp$INSPECTION_DATE[1] ,tmp$INSPECTION_DATE[row] , units = c("days"))) 
     
-    #tmp$n_dER[which(tmp$LMK_KEY %in% tmp_LMKs[row])] <- tmp_entries$n_dER[row]
-    #tmp$n_dEE[which(tmp$LMK_KEY %in% tmp_LMKs[row])] <- tmp_entries$n_dEE[row]
+    tmp$n_dER[which(tmp$LMK_KEY %in% tmp_LMKs[row])]<- tmp_entries$n_dER[1] - tmp_entries$n_dER[row] # factor as numbers
+    tmp$n_dEE[which(tmp$LMK_KEY %in% tmp_LMKs[row])] <- tmp_entries$CURRENT_ENERGY_EFFICIENCY[row] -tmp_entries$CURRENT_ENERGY_EFFICIENCY[1]
+    tmp$n_deltaDays[which(tmp$LMK_KEY %in% tmp_LMKs[row])] <- as.numeric(difftime(tmp$INSPECTION_DATE[1] , tmp$INSPECTION_DATE[row] , units = c("days"))) 
+   }
   }
 }
+
+
+str_dups_deltas <- tmp
+save(str_dups_deltas, file = 'C:/Users/billi/Dropbox/_PhD/Application Documents/CASA RA/RA OS NARRATE CASA/Code/str_dups_deltas.RData' )
 ```
 
