@@ -5,6 +5,8 @@ date: "May 12, 2022"
 output: html_document
 ---
 
+#This version is has quadratic time complexity. Est runtime 3 months
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 load(file = './MetaData&StringDups.RData')
@@ -34,26 +36,34 @@ tmp$n_dER <- as.numeric(factor(tmp$CURRENT_ENERGY_RATING,
 tmp$n_dEE <- tmp$CURRENT_ENERGY_EFFICIENCY
 ```
 
-
-
 ```{r}
 dupcol <- 'combined'
-for (entry in unique(tmp[,dupcol])) {
-  print(which(entry == unique(tmp[,dupcol])))
+i = 0
+
+uniqueRows <-  unique(tmp[,dupcol])
+
+
+for (entry in uniqueRows ) {
+  
+  #print(which(entry == unique(tmp[,dupcol])))
   #get a case of duplicates
   tmp_entries <- subset(tmp, tmp[,dupcol] == entry)
   tmp_LMKs <- unique(tmp_entries$LMK_KEY)
   
+  if(i %% 1000 == 0 ){print(paste0(i,' ', Sys.time() ) )}
+  i = i+1
   
   for (row in length(tmp_LMKs)){
   if(row > 1){ #row one is always the first entry
     # tmp_entries$n_dER[row] <- tmp_entries$n_dER[1] - tmp_entries$n_dER[row] # factor as numbers
     # tmp_entries$n_dER[row] <- tmp_entries$CURRENT_ENERGY_EFFICIENCY[row] -tmp_entries$CURRENT_ENERGY_EFFICIENCY[1]
-    # tmp_entries$n_deltaDays[row] <- as.numeric(difftime(tmp$INSPECTION_DATE[1] ,tmp$INSPECTION_DATE[row] , units = c("days"))) 
+    # tmp_entries$n_deltaDays[row] <- as.numeric(difftime(tmp_entries$INSPECTION_DATE[row] ,tmp$INSPECTION_DATE[1] , units = c("days"))) 
     
-    tmp$n_dER[which(tmp$LMK_KEY %in% tmp_LMKs[row])]<- tmp_entries$n_dER[1] - tmp_entries$n_dER[row] # factor as numbers
-    tmp$n_dEE[which(tmp$LMK_KEY %in% tmp_LMKs[row])] <- tmp_entries$CURRENT_ENERGY_EFFICIENCY[row] -tmp_entries$CURRENT_ENERGY_EFFICIENCY[1]
-    tmp$n_deltaDays[which(tmp$LMK_KEY %in% tmp_LMKs[row])] <- as.numeric(difftime(tmp$INSPECTION_DATE[1] , tmp$INSPECTION_DATE[row] , units = c("days"))) 
+    
+    index <- which(tmp$LMK_KEY %in% tmp_LMKs[row])
+    tmp$n_dER[index ]<- tmp_entries$n_dER[1] - tmp_entries$n_dER[row] # factor as numbers
+    tmp$n_dEE[index ] <- tmp_entries$CURRENT_ENERGY_EFFICIENCY[row] -tmp_entries$CURRENT_ENERGY_EFFICIENCY[1]
+    tmp$n_deltaDays[index ] <- as.numeric(difftime(tmp_entries$INSPECTION_DATE[row] ,tmp$INSPECTION_DATE[1] , units = c("days"))) 
    }
   }
 }

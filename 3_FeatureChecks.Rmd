@@ -1,0 +1,64 @@
+---
+title: "Feature_Engineering"
+author: "Boyana Buyuklieva"
+date: "May 19, 2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+```{r cars, cache = TRUE}
+load('./str_dups_deltas.RData' )
+checks <- c("firstEntry","combined",
+            "INSPECTION_DATE","n_deltaDays",
+            "CURRENT_ENERGY_RATING","n_dER",
+            "CURRENT_ENERGY_EFFICIENCY","n_dEE",
+            "LMK_KEY","LOCAL_AUTHORITY")
+
+###Remove the first entries
+repeat_dt <- str_dups_deltas[str_dups_deltas$firstEntry == F, ]
+```
+
+https://www.statmethods.net/graphs/density.html
+
+```{r timeBetween}
+#See how much time on average there is between the entries
+
+mean(repeat_dt$n_deltaDays)
+median(repeat_dt$n_deltaDays)
+
+#If the difference is very small, there might be an issue in counting the dups
+Kd_deltaDays <- density(repeat_dt$n_deltaDays) # returns the density data
+plot(Kd_deltaDays) # plots the results
+```
+
+
+```{r rankChanges}
+#What is the most common ER rank change?
+
+###Check where values are negative
+neg <- 
+
+
+
+###Check for NAs
+
+###Check and remove 0 changes 
+
+###Make a historgram of the rank changes (-5,)
+```
+
+
+```{r}
+#Are small improvements happening?
+
+###Check and remove 0 changes 
+
+
+```
+
+
