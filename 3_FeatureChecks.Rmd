@@ -13,7 +13,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r cars, cache = TRUE}
 load('./str_dups_deltas.RData' )
-checks <- c("firstEntry","combined",
+checks <- c("n_firstEntry","combined",
             "INSPECTION_DATE","n_deltaDays",
             "CURRENT_ENERGY_RATING","n_dER",
             "CURRENT_ENERGY_EFFICIENCY","n_dEE",

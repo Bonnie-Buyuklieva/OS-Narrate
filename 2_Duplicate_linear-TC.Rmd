@@ -1,0 +1,186 @@
+---
+title: "Duplicate (strings) EPCs in V10"
+author: "Boyana Buyuklieva"
+date: "May 20, 2022"
+output: html_document
+---
+
+#This version is has linear time complexity. 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r heavyload, cache=TRUE}
+start.time <- Sys.time()
+
+
+#loads str_dups [7 847 301]
+load(file = './MetaData&StringDups.RData')
+
+#Df of all rows that repeat
+tmp <- str_dups
+
+#order by similarity & date
+dupcol <- 'combined'
+date <- 'INSPECTION_DATE'
+
+tmp <- tmp[order(tmp[,dupcol],tmp[,date]),]
+#create a faster key, based on the order
+tmp$n_IDx <- seq(1,length(str_dups$LMK_KEY),1)
+
+
+print(paste('time to load:', Sys.time() - start.time))#9 mins
+```
+
+```{r define_engineered-features, cache=TRUE}
+start.time <- Sys.time()
+
+
+#flag first entries   
+tmp$n_firstEntry <- F
+firstEntry <-which(!duplicated(tmp$combined)) #3539058
+tmp$n_firstEntry[firstEntry] <- T 
+rm(firstEntry)
+
+#set up the time column, relative to Inspection Date
+tmp$n_deltaDays <-  0
+
+#Delta(ER)
+#might cause problems without trimming white spaces and caps
+tmp$n_dER <- as.numeric(factor(tmp$CURRENT_ENERGY_RATING, 
+                       ordered = T, levels = c('A','B','C','D','E','F','G')))
+tmp$n_dEE <- tmp$CURRENT_ENERGY_EFFICIENCY
+
+
+print(paste('runtime:', Sys.time() - start.time))#2 mins
+```
+
+
+```{r checks}
+
+checks <- c("n_IDx","n_firstEntry","combined",
+            "INSPECTION_DATE","n_deltaDays",
+            "CURRENT_ENERGY_RATING","n_dER",
+            "CURRENT_ENERGY_EFFICIENCY","n_dEE",
+            "LMK_KEY","LOCAL_AUTHORITY")
+
+View(head(tmp[,checks], 10))
+```
+
+
+
+
+#Verbose Version
+```{r indexSolution}
+start.time <- Sys.time()
+
+for(row in  head(tmp$n_IDx,5000)){
+  
+  if(row %% 100 == 0){print(paste(row))}
+  ##print(paste(row, ' ', group, '', zeroIDx  ))  
+  
+  
+  #set the counter
+  if(row == 1){ group <- tmp[1, dupcol]}
+  
+  if(tmp$combined[row]== group){
+    
+    if(tmp$n_firstEntry[row] == T){
+      #get the index of the first entry
+      zeroIDx <- tmp$n_IDx[row]
+    }
+    if (tmp$n_firstEntry[row] == F){
+      
+      tmp$n_dER[row ]<- tmp$n_dER[zeroIDx] - tmp$n_dER[row] # factor as numbers
+      tmp$n_dEE[row ] <- tmp$n_dEE[row] -tmp$n_dEE[zeroIDx]
+      tmp$n_deltaDays[row ] <- as.numeric(difftime(tmp$INSPECTION_DATE[row] ,tmp$INSPECTION_DATE[zeroIDx] , units = c("days"))) 
+    }
+  }
+  #if its not in the same group, then 
+  else{ 
+    group <- tmp[row, dupcol]
+    
+    if(tmp$n_firstEntry[row] == T){
+      #get the index of the first entry
+      zeroIDx <- tmp$n_IDx[row]
+    }
+    if(tmp$n_firstEntry[row] == F){
+      tmp$n_dER[row ]<- tmp$n_dER[zeroIDx] - tmp$n_dER[row] # factor as numbers
+      tmp$n_dEE[row ] <- tmp$n_dEE[row] -tmp$n_dEE[zeroIDx]
+      tmp$n_deltaDays[row ] <- as.numeric(difftime(tmp$INSPECTION_DATE[row] ,tmp$INSPECTION_DATE[zeroIDx] , units = c("days"))) 
+    }
+  }
+}
+
+print(paste('runtime:', Sys.time() - start.time)) #9 mins, for 5k
+```
+
+
+
+#Simplified Version
+```{r tester10a}
+start.time <- Sys.time()
+tester <- head(tmp,5000)
+
+for(row in  tester$n_IDx){
+  
+  #set the counter
+  if(tester$n_firstEntry[row] == T){
+    group <- tester[row, dupcol]
+    zeroIDx <- tester$n_IDx[row] 
+  }
+  
+  
+  if(tester$combined[row]== group && tester$n_firstEntry[row] == F){
+      
+      tester$n_dER[row ]<- tester$n_dER[zeroIDx] - tester$n_dER[row] # factor as numbers
+      tester$n_dEE[row ] <- tester$n_dEE[row] -tester$n_dEE[zeroIDx]
+      tester$n_deltaDays[row ] <- as.numeric(difftime(tester$INSPECTION_DATE[row] ,tester$INSPECTION_DATE[zeroIDx] , units = c("days"))) 
+  }
+}
+  
+print(paste('runtime:', Sys.time() - start.time)) 
+
+View(tester[,checks])#"runtime: 0.662122011184692"
+```
+
+```{r tester10b}
+start.time <- Sys.time()
+tester <- head(tmp,5000)
+
+for(row in head(tmp$n_IDx,5000)){
+  
+  #set the counter
+  if(tester$n_firstEntry[row] == T){
+    group <- tester[row, dupcol]
+    zeroIDx <- tester$n_IDx[row] 
+  }
+  
+  
+  if(tester$combined[row]== group && tester$n_firstEntry[row] == F){
+      
+      tester$n_dER[row ]<- tester$n_dER[zeroIDx] - tester$n_dER[row] # factor as numbers
+      tester$n_dEE[row ] <- tester$n_dEE[row] -tester$n_dEE[zeroIDx]
+      tester$n_deltaDays[row ] <- as.numeric(difftime(tester$INSPECTION_DATE[row] ,tester$INSPECTION_DATE[zeroIDx] , units = c("days"))) 
+  }
+}
+  
+print(paste('runtime:', Sys.time() - start.time)) 
+
+View(tester[,checks])#"runtime: 0.806140899658203"
+#writing the variable wastes time
+```
+
+
+
+
+
+
+
+
+```{r}
+str_dups_deltas <- tmp
+save(str_dups_deltas, file = 'C:/Users/billi/Dropbox/_PhD/Application Documents/CASA RA/RA OS NARRATE CASA/Code/str_dups_deltas.RData' )
+```
+
