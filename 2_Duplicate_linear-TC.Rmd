@@ -11,6 +11,15 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+```{r checks}
+subsetCols <- c("combined",
+            "INSPECTION_DATE",
+            "CURRENT_ENERGY_RATING",
+            "CURRENT_ENERGY_EFFICIENCY",
+            "LMK_KEY","LOCAL_AUTHORITY")
+```
+
+
 ```{r heavyload, cache=TRUE}
 start.time <- Sys.time()
 
@@ -19,7 +28,12 @@ start.time <- Sys.time()
 load(file = './MetaData&StringDups.RData')
 
 #Df of all rows that repeat
-tmp <- str_dups
+tmp <- str_dups[,subsetCols ]
+rm(str_dups)
+
+##memory.size()
+gc()#collect garbage 
+
 
 #order by similarity & date
 dupcol <- 'combined'
@@ -27,7 +41,7 @@ date <- 'INSPECTION_DATE'
 
 tmp <- tmp[order(tmp[,dupcol],tmp[,date]),]
 #create a faster key, based on the order
-tmp$n_IDx <- seq(1,length(str_dups$LMK_KEY),1)
+tmp$n_IDx <- seq(1,length(tmp$LMK_KEY),1)
 
 
 print(paste('time to load:', Sys.time() - start.time))#9 mins
@@ -58,94 +72,104 @@ print(paste('runtime:', Sys.time() - start.time))#2 mins
 
 
 ```{r checks}
-
 checks <- c("n_IDx","n_firstEntry","combined",
             "INSPECTION_DATE","n_deltaDays",
             "CURRENT_ENERGY_RATING","n_dER",
             "CURRENT_ENERGY_EFFICIENCY","n_dEE",
             "LMK_KEY","LOCAL_AUTHORITY")
-
-View(head(tmp[,checks], 10))
 ```
 
-
-
-
-#Verbose Version
-```{r indexSolution}
-start.time <- Sys.time()
-
-for(row in  head(tmp$n_IDx,5000)){
-  
-  if(row %% 100 == 0){print(paste(row))}
-  ##print(paste(row, ' ', group, '', zeroIDx  ))  
-  
-  
-  #set the counter
-  if(row == 1){ group <- tmp[1, dupcol]}
-  
-  if(tmp$combined[row]== group){
-    
-    if(tmp$n_firstEntry[row] == T){
-      #get the index of the first entry
-      zeroIDx <- tmp$n_IDx[row]
-    }
-    if (tmp$n_firstEntry[row] == F){
-      
-      tmp$n_dER[row ]<- tmp$n_dER[zeroIDx] - tmp$n_dER[row] # factor as numbers
-      tmp$n_dEE[row ] <- tmp$n_dEE[row] -tmp$n_dEE[zeroIDx]
-      tmp$n_deltaDays[row ] <- as.numeric(difftime(tmp$INSPECTION_DATE[row] ,tmp$INSPECTION_DATE[zeroIDx] , units = c("days"))) 
-    }
-  }
-  #if its not in the same group, then 
-  else{ 
-    group <- tmp[row, dupcol]
-    
-    if(tmp$n_firstEntry[row] == T){
-      #get the index of the first entry
-      zeroIDx <- tmp$n_IDx[row]
-    }
-    if(tmp$n_firstEntry[row] == F){
-      tmp$n_dER[row ]<- tmp$n_dER[zeroIDx] - tmp$n_dER[row] # factor as numbers
-      tmp$n_dEE[row ] <- tmp$n_dEE[row] -tmp$n_dEE[zeroIDx]
-      tmp$n_deltaDays[row ] <- as.numeric(difftime(tmp$INSPECTION_DATE[row] ,tmp$INSPECTION_DATE[zeroIDx] , units = c("days"))) 
-    }
-  }
-}
-
-print(paste('runtime:', Sys.time() - start.time)) #9 mins, for 5k
-```
 
 
 
 #Simplified Version
-```{r tester10a}
-start.time <- Sys.time()
-tester <- head(tmp,5000)
 
-for(row in  tester$n_IDx){
+```{r solved_faster}
+
+testingN <- length(tmp$combined)
+# testingN <- 50000
+
+start.time <- Sys.time()
+tester <- head(tmp,testingN)
+
+
+#vector giving  start of the repeats / group 
+rangeStarts <- numeric(testingN)
+for (row in tester$n_IDx) {
   
-  #set the counter
-  if(tester$n_firstEntry[row] == T){
-    group <- tester[row, dupcol]
-    zeroIDx <- tester$n_IDx[row] 
+  if (tester$n_firstEntry[row] == T) {
+    groupStart <- row
   }
   
+  rangeStarts[row] <- groupStart
+} 
+print(paste('loop runtime:', Sys.time() - start.time)) # (.2 sec / 5k)  (20s / 8M)
+
+
+
+start.time <- Sys.time()
+tester$n_dER <- tester$n_dER[rangeStarts] - tester$n_dER # factor as numbers
+tester$n_dEE <- tester$n_dEE - tester$n_dEE[rangeStarts]
+tester$n_deltaDays <- as.numeric(difftime(tester$INSPECTION_DATE, tester$INSPECTION_DATE[rangeStarts], units = c("days"))) 
+print(paste('operation runtime:', Sys.time() - start.time)) # (0.01 sec / 5k) (.5 / 8M)
+
+
+print(paste('runtime:', Sys.time() - start.time)) # (approx 60s / 8 m)
+
+#View(tester[,checks])
+
+```
+
+#other versions
+
+```{r solved}
+
+testingN <- length(tmp$combined)
+# testingN <- 50000
+
+start.time <- Sys.time()
+tester <- head(tmp,testingN)
+
+# numeric always fills with zeros
+new_n_dER <- numeric(testingN)
+new_n_dEE <- numeric(testingN)
+new_n_deltaDays <- numeric(testingN)
+
+for (row in tester$n_IDx) {
   
-  if(tester$combined[row]== group && tester$n_firstEntry[row] == F){
-      
-      tester$n_dER[row ]<- tester$n_dER[zeroIDx] - tester$n_dER[row] # factor as numbers
-      tester$n_dEE[row ] <- tester$n_dEE[row] -tester$n_dEE[zeroIDx]
-      tester$n_deltaDays[row ] <- as.numeric(difftime(tester$INSPECTION_DATE[row] ,tester$INSPECTION_DATE[zeroIDx] , units = c("days"))) 
+  # set the counter
+  if (tester$n_firstEntry[row] == T) {
+    # group <- tester[row, dupcol]
+    zeroIDx <- row
+  }
+
+  # stopifnot(tester$combined[row]== group)
+  if (tester$n_firstEntry[row] == F) {
+
+    # THIS IS SLOW :
+    # tester$n_dER[row] <- tester$n_dER[zeroIDx] - tester$n_dER[row] # factor as numbers
+    # tester$n_dEE[row] <- tester$n_dEE[row] - tester$n_dEE[zeroIDx]
+    # tester$n_deltaDays[row ] <- as.numeric(difftime(tester$INSPECTION_DATE[row], tester$INSPECTION_DATE[zeroIDx], units = c("days"))) 
+    
+    new_n_dER[row] <- tester$n_dER[zeroIDx] - tester$n_dER[row] # factor as numbers
+    new_n_dEE[row] <- tester$n_dEE[row] - tester$n_dEE[zeroIDx]
+    new_n_deltaDays[row] <- as.numeric(difftime(tester$INSPECTION_DATE[row], tester$INSPECTION_DATE[zeroIDx], units = c("days"))) 
   }
 }
+
+
+#helps because outside of loop
+tester$n_dER <- new_n_dER
+tester$n_dEE <- new_n_dEE
+tester$n_deltaDays <- new_n_deltaDays
   
 print(paste('runtime:', Sys.time() - start.time)) 
 
-View(tester[,checks])#"runtime: 0.662122011184692"
+#View(tester[,checks])# runtime est. 6min
+
 ```
 
-```{r tester10b}
+```{r tester}
 start.time <- Sys.time()
 tester <- head(tmp,5000)
 
@@ -176,7 +200,51 @@ View(tester[,checks])#"runtime: 0.806140899658203"
 
 
 
+#Verbose Version
+```{r indexSolution}
+start.time <- Sys.time()
+tester <- head(tmp,5000)
 
+for(row in  tester$n_IDx){
+  
+  if(row %% 100 == 0){print(paste(row))}
+  ##print(paste(row, ' ', group, '', zeroIDx  ))  
+  
+  
+  #set the counter
+  if(row == 1){ group <- tester[1, dupcol]}
+  
+  if(tester$combined[row]== group){
+    
+    if(tester$n_firstEntry[row] == T){
+      #get the index of the first entry
+      zeroIDx <- tester$n_IDx[row]
+    }
+    if (tester$n_firstEntry[row] == F){
+      
+      tester$n_dER[row ]<- tester$n_dER[zeroIDx] - tester$n_dER[row] # factor as numbers
+      tester$n_dEE[row ] <- tester$n_dEE[row] -tester$n_dEE[zeroIDx]
+      tester$n_deltaDays[row ] <- as.numeric(difftime(tester$INSPECTION_DATE[row] ,tester$INSPECTION_DATE[zeroIDx] , units = c("days"))) 
+    }
+  }
+  #if its not in the same group, then 
+  else{ 
+    group <- tester[row, dupcol]
+    
+    if(tester$n_firstEntry[row] == T){
+      #get the index of the first entry
+      zeroIDx <- tester$n_IDx[row]
+    }
+    if(tester$n_firstEntry[row] == F){
+      tester$n_dER[row ]<- tester$n_dER[zeroIDx] - tester$n_dER[row] # factor as numbers
+      tester$n_dEE[row ] <- tester$n_dEE[row] -tester$n_dEE[zeroIDx]
+      tester$n_deltaDays[row ] <- as.numeric(difftime(tester$INSPECTION_DATE[row] ,tester$INSPECTION_DATE[zeroIDx] , units = c("days"))) 
+    }
+  }
+}
+
+print(paste('runtime:', Sys.time() - start.time)) #9 mins, for 5k  // runtime: 1.07408690452576
+```
 
 
 ```{r}
