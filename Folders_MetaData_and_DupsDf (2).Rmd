@@ -42,6 +42,7 @@ folders_meta$LdateMedian <- 0 #Problem NAs
 
 ## CURRENT_ENERGY_RATING (factor)
 folders_meta$cERmedian <- 0
+folders_meta$PerCentcER_underC <- 0
 
 
 ## POTENTIAL - CURRENT_ENERGY_EFFICIENCY (int)
@@ -49,7 +50,9 @@ folders_meta$p_cEEficMedian <- 0 #Problem NAs
 folders_meta$p_cEEficMean <- 0
 folders_meta$p_cEEficSD <- 0
 
-##ADDD\1
+
+
+##ADD
 ##percent rental 
 ## percent rental that are B-D, Percent rental under D
 
@@ -61,6 +64,7 @@ folders_meta$p_cEEficSD <- 0
 
 ```{r loop}
 str_dups <- data.frame()
+tenure_LUT <- list ()
 
 for (f in folders) {
   print(f)
@@ -72,12 +76,14 @@ for (f in folders) {
         LODGEMENT_DATETIME = col_character()))
   #LODGEMENT_DATETIME = col_character() because it sometimes includes H:M:S
   
+  
   #Dups df #######################################
   certificates$combined <- paste0(certificates$ADDRESS, certificates$POSTCODE) #measure of repeat entry here
   tmpdups <- certificates[duplicated(certificates$combined) | duplicated(certificates$combined, fromLast = TRUE),]
   tmpdups$folder <- LA #folder info
   tmpdups <- tmpdups[order(tmpdups$combined, tmpdups$INSPECTION_DATE),]
   str_dups <- rbind(str_dups,tmpdups)
+
   
   
   
@@ -87,30 +93,36 @@ for (f in folders) {
   folders_meta[folders_meta$name == LA,]$PerCentOneOffEntries <- 1 - length(tmpdups$LMK_KEY)/length(certificates$LMK_KEY) ## % one-off entries by folder.
   
   ## Min, Max, Mean, SD of INSPECTION DATE and/or Lodgementdate
-  folders_meta[folders_meta$name == LA,]$IdateMin <- min(Year(certificates$INSPECTION_DATE))
-  folders_meta[folders_meta$name == LA,]$IdateMax <- max(Year(certificates$INSPECTION_DATE))
-  folders_meta[folders_meta$name == LA,]$IdateMedian <- median(Year(certificates$INSPECTION_DATE))
+  folders_meta[folders_meta$name == LA,]$IdateMin <- min(Year(certificates$INSPECTION_DATE), na.rm = T)
+  folders_meta[folders_meta$name == LA,]$IdateMax <- max(Year(certificates$INSPECTION_DATE), na.rm = T)
+  folders_meta[folders_meta$name == LA,]$IdateMedian <- median(Year(certificates$INSPECTION_DATE), na.rm = T)
 
   
-  folders_meta[folders_meta$name == LA,]$LdateMin <- min(Year(certificates$LODGEMENT_DATETIME))
-  folders_meta[folders_meta$name == LA,]$LdateMax <- max(Year(certificates$LODGEMENT_DATETIME))
-  folders_meta[folders_meta$name == LA,]$LdateMedian <- median(Year(certificates$LODGEMENT_DATETIME))
+  folders_meta[folders_meta$name == LA,]$LdateMin <- min(Year(certificates$LODGEMENT_DATETIME), na.rm = T)
+  folders_meta[folders_meta$name == LA,]$LdateMax <- max(Year(certificates$LODGEMENT_DATETIME), na.rm = T)
+  folders_meta[folders_meta$name == LA,]$LdateMedian <- median(Year(certificates$LODGEMENT_DATETIME), na.rm = T)
   
   ## CURRENT_ENERGY_RATING (factor)
   certificates$CURRENT_ENERGY_RATING <- as.numeric(factor(certificates$CURRENT_ENERGY_RATING, 
                        ordered = T, levels = c('A','B','C','D','E','F','G')))
-  folders_meta[folders_meta$name == LA,]$cERmedian <- median(certificates$CURRENT_ENERGY_RATING)
-  
+  folders_meta[folders_meta$name == LA,]$cERmedian <- median(certificates$CURRENT_ENERGY_RATING, na.rm = T)
+  folders_meta[folders_meta$name == LA,]$PerCentcER_underC <- sum(na.omit(certificates$CURRENT_ENERGY_RATING >3))/length(certificates$LMK_KEY)
   
   ## POTENTIAL - CURRENT_ENERGY_EFFICIENCY (int)
-  folders_meta[folders_meta$name == LA,]$p_cEEficMedian <- median(certificates$POTENTIAL_ENERGY_EFFICIENCY - certificates$CURRENT_ENERGY_EFFICIENCY)
-  folders_meta[folders_meta$name == LA,]$p_cEEficMean <- mean(certificates$POTENTIAL_ENERGY_EFFICIENCY - certificates$CURRENT_ENERGY_EFFICIENCY)
-  folders_meta[folders_meta$name == LA,]$p_cEEficSD <- sd(certificates$POTENTIAL_ENERGY_EFFICIENCY - certificates$CURRENT_ENERGY_EFFICIENCY)
+  folders_meta[folders_meta$name == LA,]$p_cEEficMedian <- median(certificates$POTENTIAL_ENERGY_EFFICIENCY - certificates$CURRENT_ENERGY_EFFICIENCY, na.rm = T)
+  folders_meta[folders_meta$name == LA,]$p_cEEficMean <- mean(certificates$POTENTIAL_ENERGY_EFFICIENCY - certificates$CURRENT_ENERGY_EFFICIENCY, na.rm = T)
+  folders_meta[folders_meta$name == LA,]$p_cEEficSD <- sd(certificates$POTENTIAL_ENERGY_EFFICIENCY - certificates$CURRENT_ENERGY_EFFICIENCY, na.rm = T)
   
+  tenure_LUT[[LA]] <- unique(certificates$TENURE)
+
 }
 
-```
+#write.csv(folders_meta, '../Outputs/folder_meta.csv')
 
+unique <- as.data.frame(unlist(tenure_LUT))
+unique <- unique(unique$`unlist(tenure_LUT)`)
+#write.csv(unique(unlist(unique )), '../Outputs/WIP_tenure_LUT.csv')
+```
 
 
 
@@ -131,23 +143,3 @@ str_dups <- str_dups[order(str_dups$combined, str_dups$INSPECTION_DATE),]
 ```
 
 
-[Information on how the Energy Rating map to Energy Efficiency](https://www.edfenergy.com/energy-efficiency/how-improve-your-epc-rating)
-
-
-```{r}
-#detecting an improvement
-## this can be based on the 'CURRENT_ENERGY_RATING': "E" "B" "C" "D" "F" "G" "A"
-## or 'CURRENT_ENERGY_EFFICIENCY'
-#### NOTES: 'POTENTIAL_ENERGY_RATING','POTENTIAL_ENERGY_EFFICIENCY'
-
-c <- c('combined','INSPECTION_DATE','firstEntry','n_delta')
-
-tmp <- head(str_dups,25)
-
-
-#get the first entry
-firstEntry <-which(!duplicated(tmp$combined))
-tmp$firstEntry <- F
-tmp$firstEntry[firstEntry] <- T
-
-}

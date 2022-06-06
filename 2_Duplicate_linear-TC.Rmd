@@ -248,7 +248,7 @@ print(paste('runtime:', Sys.time() - start.time)) #9 mins, for 5k  // runtime: 1
 
 
 ```{r}
-str_dups_deltas <- tmp
-save(str_dups_deltas, file = 'C:/Users/billi/Dropbox/_PhD/Application Documents/CASA RA/RA OS NARRATE CASA/Code/str_dups_deltas.RData' )
+str_dups_deltas_c11 <- tester
+save(str_dups_deltas_c11, file = 'C:/Users/billi/Dropbox/_PhD/Application Documents/CASA RA/RA OS NARRATE CASA/Code/str_dups_deltas_c11.RData' )
 ```
 

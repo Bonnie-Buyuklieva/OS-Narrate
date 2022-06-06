@@ -1,0 +1,105 @@
+---
+title: "Duplicate (strings) EPCs in V10"
+author: "Boyana Buyuklieva"
+date: "May 4, 2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readr)
+#library(DescTools)
+
+library(dplyr)
+library(tidyr)
+```
+
+
+
+```{r path}
+WIP_tenure_LUT <- read_csv("../Outputs/WIP_tenure_LUT.csv")
+
+#get folders
+folders <- list.files(path = "../Data/all-domestic-certificates", pattern = NULL, all.files = FALSE,
+           full.names = FALSE, recursive = FALSE,
+           ignore.case = FALSE, include.dirs = FALSE, no.. = FALSE)
+
+folders <- folders[-342] #remove the .txt
+```
+
+
+```{r meta_vars}
+#Get difference by LAD, eg.g: 
+folders_meta <- data.frame(names = folders)
+
+folers_meta$m_TENURE <- ''
+```
+
+
+```{r test}
+tmp <- certificates
+
+certificates$m_TENURE <- WIP_tenure_LUT$Harmonised[match(unlist(certificates$TENURE), WIP_tenure_LUT$Database)]
+
+View(cbind(a,certificates$TENURE ))
+
+
+
+
+test <- head(certificates)
+test <- certificates
+
+#na.omit(certificates$CURRENT_ENERGY_RATING >3))
+
+
+test$m_Crel <- ifelse(test$CURRENT_ENERGY_RATING == 'C', 'C', ifelse(test$CURRENT_ENERGY_RATING %in% c('A', 'B'), 'C+', ifelse(test$CURRENT_ENERGY_RATING %in% c('D', 'E','F','G'),'C-','NA' )))
+test$m_Crel <- factor(test$m_Crel, levels = c('C+','C','C-'))
+test$m_TENURE <- factor(test$m_TENURE, levels = unique(WIP_tenure_LUT$Harmonised))
+
+View(test[,c('m_TENURE','CURRENT_ENERGY_RATING', 'm_Crel')])
+
+
+#works but no ) for empty factors
+aggregate(LMK_KEY ~   m_TENURE + m_Crel, data = test, FUN = length)
+
+
+
+
+
+
+
+a <- test %>% group_by(m_TENURE,m_Crel, .drop = FALSE) %>% summarise(n=n())
+
+
+
+
+
+
+
+```
+
+
+
+```{r loop}
+str_dups <- data.frame()
+tenure_LUT <- list ()
+
+for (f in folders) {
+  print(f)
+  LA <- f
+  certificates <- read_csv(paste0("../Data/all-domestic-certificates/",LA,"/certificates.csv"), 
+    col_types = cols(COUNTY = col_character(), MAIN_HEATING_CONTROLS = col_character(),
+        INSPECTION_DATE = col_date(format = "%Y-%m-%d"), 
+        LMK_KEY = col_character(), LODGEMENT_DATE = col_date(format = "%Y-%m-%d"), 
+        LODGEMENT_DATETIME = col_character()))
+  #LODGEMENT_DATETIME = col_character() because it sometimes includes H:M:S
+  
+  folers_meta$m_TENURE <- WIP_tenure_LUT$Harmonised[match(unlist(certificates$TENURE), WIP_tenure_LUT$Database)]
+  
+
+  
+}
+```
+
+
+
