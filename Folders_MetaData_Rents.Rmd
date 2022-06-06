@@ -81,8 +81,9 @@ a <- test %>% group_by(m_TENURE,m_Crel, .drop = FALSE) %>% summarise(n=n())
 
 
 ```{r loop}
-str_dups <- data.frame()
-tenure_LUT <- list ()
+C_relative <- data.frame()
+names(C_relative) <- c('m_TENURE', 'm_Crel', 'n', 'LA')
+
 
 for (f in folders) {
   print(f)
@@ -94,9 +95,28 @@ for (f in folders) {
         LODGEMENT_DATETIME = col_character()))
   #LODGEMENT_DATETIME = col_character() because it sometimes includes H:M:S
   
-  folers_meta$m_TENURE <- WIP_tenure_LUT$Harmonised[match(unlist(certificates$TENURE), WIP_tenure_LUT$Database)]
+  certificates$m_TENURE <- WIP_tenure_LUT$Harmonised[match(unlist(certificates$TENURE), WIP_tenure_LUT$Database)]
   
+  certificates$m_Crel <- ifelse(certificates$CURRENT_ENERGY_RATING == 'C', 'C', 
+                                ifelse(certificates$CURRENT_ENERGY_RATING %in% c('A', 'B'), 'C+', 
+                                       ifelse(certificates$CURRENT_ENERGY_RATING %in% c('D', 'E','F','G'),'C-','NA' )))
+  
+  #make as factor
+  certificates$m_Crel <- factor(certificates$m_Crel, levels = c('C+','C','C-'))
+  certificates$m_TENURE <- factor(certificates$m_TENURE, levels = unique(WIP_tenure_LUT$Harmonised))
 
+
+
+
+
+
+
+rows <- certificates %>% 
+  group_by(m_TENURE,m_Crel, .drop = FALSE) %>% 
+  summarise(n=n(),
+            folder = LA)
+
+C_relative <- rbind(C_relative, as.data.frame(rows))
   
 }
 ```
