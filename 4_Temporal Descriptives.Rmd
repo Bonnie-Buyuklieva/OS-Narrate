@@ -7,6 +7,8 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(tidyverse)
 ```
 
 ```{r}
@@ -15,6 +17,15 @@ load('./str_dups_deltas_c11.RData')
 
 
 ```{r}
+test <- head(str_dups_deltas_c11,20)
 
+a <- test %>%
+  group_by(combined) %>%
+  summarise(appears = n())
+
+
+b <- a %>%
+  group_by(appears) %>%
+  summarise(count = n())
 ```
 

@@ -28,60 +28,9 @@ folders <- folders[-342] #remove the .txt
 ```
 
 
-```{r meta_vars}
-#Get difference by LAD, eg.g: 
-folders_meta <- data.frame(names = folders)
-
-folers_meta$m_TENURE <- ''
-```
-
-
-```{r test}
-tmp <- certificates
-
-certificates$m_TENURE <- WIP_tenure_LUT$Harmonised[match(unlist(certificates$TENURE), WIP_tenure_LUT$Database)]
-
-View(cbind(a,certificates$TENURE ))
-
-
-
-
-test <- head(certificates)
-test <- certificates
-
-#na.omit(certificates$CURRENT_ENERGY_RATING >3))
-
-
-test$m_Crel <- ifelse(test$CURRENT_ENERGY_RATING == 'C', 'C', ifelse(test$CURRENT_ENERGY_RATING %in% c('A', 'B'), 'C+', ifelse(test$CURRENT_ENERGY_RATING %in% c('D', 'E','F','G'),'C-','NA' )))
-test$m_Crel <- factor(test$m_Crel, levels = c('C+','C','C-'))
-test$m_TENURE <- factor(test$m_TENURE, levels = unique(WIP_tenure_LUT$Harmonised))
-
-View(test[,c('m_TENURE','CURRENT_ENERGY_RATING', 'm_Crel')])
-
-
-#works but no ) for empty factors
-aggregate(LMK_KEY ~   m_TENURE + m_Crel, data = test, FUN = length)
-
-
-
-
-
-
-
-a <- test %>% group_by(m_TENURE,m_Crel, .drop = FALSE) %>% summarise(n=n())
-
-
-
-
-
-
-
-```
-
-
 
 ```{r loop}
-C_relative <- data.frame()
+C_relative <- data.frame(matrix(ncol = 4, nrow = 0))
 names(C_relative) <- c('m_TENURE', 'm_Crel', 'n', 'LA')
 
 
@@ -105,13 +54,7 @@ for (f in folders) {
   certificates$m_Crel <- factor(certificates$m_Crel, levels = c('C+','C','C-'))
   certificates$m_TENURE <- factor(certificates$m_TENURE, levels = unique(WIP_tenure_LUT$Harmonised))
 
-
-
-
-
-
-
-rows <- certificates %>% 
+  rows <- certificates %>% 
   group_by(m_TENURE,m_Crel, .drop = FALSE) %>% 
   summarise(n=n(),
             folder = LA)
@@ -119,6 +62,9 @@ rows <- certificates %>%
 C_relative <- rbind(C_relative, as.data.frame(rows))
   
 }
+
+
+write.csv(C_relative, file = "../Outputs/WIP_c_relative_tenure.csv")
 ```
 
 
