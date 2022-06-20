@@ -17,15 +17,20 @@ load('./str_dups_deltas_c11.RData')
 
 
 ```{r}
-test <- head(str_dups_deltas_c11,20)
+start.time <- Sys.time()
 
-a <- test %>%
-  group_by(combined) %>%
+tmp <- str_dups_deltas_c11 %>%
+  group_by(LOCAL_AUTHORITY, combined) %>% #similarity metric here 
   summarise(appears = n())
 
 
-b <- a %>%
+appearance_matrix <- tmp %>%
   group_by(appears) %>%
   summarise(count = n())
+
+print(paste('runtime:', Sys.time() - start.time))
+
+
+write.csv( subset(tmp, tmp$appears>9), file = '../Outputs/WIP_appearance_matrix_over_9.csv')
 ```
 
