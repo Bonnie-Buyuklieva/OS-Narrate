@@ -25,16 +25,6 @@ print(paste('sort time:', Sys.time() - start.time)) #"sort time: 16.833909034729
 ```
 
 
-
-```{r checks}
-subsetCols <- c("LMK_KEY","INSPECTION_DATE","LODGEMENT_DATE",
-            "CURRENT_ENERGY_RATING",
-            "CURRENT_ENERGY_EFFICIENCY",
-            "ADDRESS", "POSTCODE",
-            "UPRN","UPRN_SOURCE","LOCAL_AUTHORITY", "LOCAL_AUTHORITY_LABEL","POSTTOWN","CONSTITUENCY_LABEL")
-```
-
-
 ```{r path}
 #get folders
 folders <- list.files(path = "../Data/all-domestic-certificates", pattern = NULL, all.files = FALSE,
@@ -49,31 +39,18 @@ folders <- folders[-342] #remove the .txt
 ```{r loop}
 str_dups <- data.frame()
 uprn_dups <- data.frame()
+udbc_UPRN <- data.frame()
+folders_meta_dups <- data.frame()
+
 
 counter = 0
 
+start.time <- Sys.time()
 for (LA in folders) {
-  counter = counter + 1
+  
   if( counter %% 20 == 0){print(LA)} 
-  
-  #speed by subset? - expensive
-  start.time <- Sys.time()
-  certificates <- read_csv(paste0("../Data/all-domestic-certificates/",LA,"/certificates.csv"), 
-    col_types = cols(COUNTY = col_character(), MAIN_HEATING_CONTROLS = col_character(),
-        INSPECTION_DATE = col_date(format = "%Y-%m-%d"), 
-        LMK_KEY = col_character(), LODGEMENT_DATE = col_date(format = "%Y-%m-%d"), 
-        LODGEMENT_DATETIME = col_character()))
-  
-  certificates <- certificates[,subsetCols]
-  certificates$folder <- LA 
-  print(paste('load time:', Sys.time() - start.time)) #1.84
-  
-  
-  
-  
-  #speed by reading less?
-  start.time <- Sys.time()
-    certificates_fast <- read_csv(paste0("../Data/all-domestic-certificates/",LA,"/certificates.csv"), 
+  #CSV read
+    certificates <- read_csv(paste0("../Data/all-domestic-certificates/",LA,"/certificates.csv"), 
     col_types = cols_only(
                           LMK_KEY = col_character(), 
                           INSPECTION_DATE = col_date(format = "%Y-%m-%d"),
@@ -85,74 +62,79 @@ for (LA in folders) {
                           POSTCODE = col_character(),
                           UPRN = col_character(),
                           UPRN_SOURCE = col_character(),
-                          LOCAL_AUTHORIT = col_character(),
+                          LOCAL_AUTHORITY = col_character(),
                           LOCAL_AUTHORITY_LABEL = col_character(),
                           POSTTOWN = col_character(),
                           CONSTITUENCY_LABEL = col_character(),
                           TRANSACTION_TYPE = col_character(),
                           TENURE = col_character(),
                           COUNTY = '?') )
-    certificates_fast$folder <- LA #folder info
-   print(paste('load time:', Sys.time() - start.time)) #load time: 1.49
-   certificates <- certificates_fast
-
+    
+    certificates$folder <- LA #folder info
+    row <- LA
+      
+  #Add the dups counts at folder level
+  row <- cbind(row,length(certificates$LMK_KEY) )#denominator
+  #Count empty UPRNs 
+  row <- cbind(row,sum(is.na(certificates$UPRN)))  
   
-   
-
-  
+    
+  if(F){
   ###Dups df #######################################
   ##Baseline: by string match
   certificates$combined <- paste0(certificates$ADDRESS, certificates$POSTCODE) #measure of repeat entry here
   tmpdups <- certificates[duplicated(certificates$combined) | duplicated(certificates$combined, fromLast = TRUE),]
   tmpdups <- tmpdups[order(tmpdups$combined, tmpdups$INSPECTION_DATE),]
   str_dups <- rbind(str_dups,tmpdups)
+  row <- cbind(row, length(tmpdups$LMK_KEY)) 
   
   
-  ##Based on UPRNs
-  #Count empty UPRNs
+  #Based on UPRNs
   tmpdups1 <- certificates[duplicated(certificates$UPRN) | duplicated(certificates$UPRN, fromLast = TRUE),]
-  tmpdups1$naUPRN <- sum(is.na(certificates$UPRN))
-  uprn_dups <- rbind(uprn_dups,tmpdups)
+  uprn_dups <- rbind(uprn_dups,tmpdups1)
   
+
+  row <- cbind(row, length(tmpdups1$LMK_KEY) ) 
+    
   ##Manual Based on Bin's V9:
-  
-  #unlisting - expensive
-  start.time <- Sys.time()
-  certificates$udbc_UPRN <- ubdc_link$ubdc_uprn[match(unlist(certificates$LMK_KEY), ubdc_link$lmk_key)]
-  tmpdups2 <- certificates[duplicated(certificates$UPRN) | duplicated(certificates$UPRN, fromLast = TRUE),]
-  print(paste('time with unlist:', Sys.time() - start.time)) # "time with unlist: 3.45"
-  
-  #no unlisting
   start.time <- Sys.time()
   certificates$udbc_UPRN <- ubdc_link$ubdc_uprn[match(certificates$LMK_KEY, ubdc_link$lmk_key)]
+  
+
+  #certificates$udbc_UPRN <- ubdc_link$ubdc_uprn[bsearch(certificates$LMK_KEY, ubdc_link$lmk_key)]
+  #binsearch / gtools
+  #make ubdc_link$ubdc_uprn  a data.table , then setkey(data.table, key)  // touch by data.table[key]
+  
+  #test!
+  #library(Dict)
+  #ages <- Dict$new(ubdc_link$lmk_key,ubdc_link$ubdc_uprn)
+    }
+  
+  
   tmpdups2_2 <- certificates[duplicated(certificates$UPRN) | duplicated(certificates$UPRN, fromLast = TRUE),]
-  print(paste('time without unlist:', Sys.time() - start.time)) #"time without unlist: 3.05"
+  udbc_UPRN <- rbind(udbc_UPRN,tmpdups2_2)
+  #print(paste('time without unlist:', Sys.time() - start.time)) #"time without unlist: 3.05"
+  row <- cbind(row, length(tmpdups2_2$LMK_KEY)) 
   
-  
-  
-  #no unlisting
-  #with ordering - very expensive
-  start.time <- Sys.time()
-  certificates <- certificates[order(certificates$LMK_KEY),] #order certificates as the LUT
-  certificates$udbc_UPRN <- ubdc_link$ubdc_uprn[match(certificates$LMK_KEY, ubdc_link$lmk_key)]
-  tmpdups2_1 <- certificates[duplicated(certificates$UPRN) | duplicated(certificates$UPRN, fromLast = TRUE),]
-  print(paste('time without unlist:', Sys.time() - start.time)) #"time without unlist: 4.86 (ubdc_link-unordered) / 4.43 (ubdc_link-ordered)"
+  folders_meta_dups <-rbind(folders_meta_dups, row)
   
 
+  rm(tmpdups,tmpdups1,tmpdups2_2,row)
+  gc()
   
-  
-  
-  
-  
-  # Add the dups counts at folder level
-  # % one-off entries by folder.
-  ##folders_meta[folders_meta$name == LA,]$totalEntries <- length(certificates$LMK_KEY) #denominator
-  ##folders_meta[folders_meta$name == LA,]$PerCentOneOffEntries <- 1 - length(tmpdups$LMK_KEY)/length(certificates$LMK_KEY) 
-  
+  counter = counter + 1
 }
+print(paste('loop time:', Sys.time() - start.time))
+#summary: Bin V9 LUT alone took 2h15 mins to complete. Creating dupsdf of 3.9GB 
+names(folders_meta_dups) <- c('folder', 'totalRows', 'NA_uprn', 'UPRN_uniq')
+#write.csv(folders_meta_dups, '../Outputs/folders_meta_dups_UPRN_uniq.csv')
+#save(udbc_UPRN, file = '../Data/WIP_UPRN.RData')
 
-#write.csv(folders_meta, '../Outputs/  .csv')
+names(folders_meta_dups) <- c('folder', 'totalRows', 'NA_uprn','str_uniq', 'uprn_uniq', 'udbcUPRN_uniq')
+
+
 ```
+
 
 
 
