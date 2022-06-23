@@ -139,12 +139,7 @@ names(folders_meta_dups) <- c('folder', 'totalRows', 'NA_uprn','str_uniq', 'uprn
 ```{r}
 load(file = 'C:/Users/billi/Dropbox/_PhD/Application Documents/CASA RA/RA OS NARRATE CASA/Data/WIP_UPRN.RData')
 
-UPRN <- udbc_UPRN
-save(UPRN, file = '../Data/WIP_UPRN.RData')
-
 load(file = 'C:/Users/billi/Dropbox/_PhD/Application Documents/CASA RA/RA OS NARRATE CASA/Data/WIP_udbc_UPRN.RData')
-
-
 
 load(file = 'C:/Users/billi/Dropbox/_PhD/Application Documents/CASA RA/RA OS NARRATE CASA/Data/MetaData&StringDups.RData')
 ```
