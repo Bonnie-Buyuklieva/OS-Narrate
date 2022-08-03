@@ -68,16 +68,17 @@ for (LA in folders) {
     
     repeat_str <- duplicated(certificates$str_concat)|duplicated(certificates$str_concat, fromLast = T)
     
-    
-    repeat_nUPRN <- duplicated(certificates$n_UPRN)|duplicated(certificates$n_UPRN, fromLast = T) 
-    NA_nUPRN <- which(is.na(certificates$n_UPRN))# remove nas that slip through as duplicates
-    repeat_nUPRN <- setdiff(which(repeat_nUPRN),NA_nUPRN)
+    #changed syntax because duplicate() won't work: Int64 gets converted into double Issue here
+    ## example: duplicated(certificates$n_UPRN, fromLast = T ) [c(6971,14575)] = F, T
+    repeat_nUPRN <- (duplicated(certificates, by = "n_UPRN")|duplicated(certificates, by = "n_UPRN", fromLast = T)) & !is.na(certificates$n_UPRN)
  
-    
-    dup_idx <- union(which(repeat_str),repeat_nUPRN)
+
+    dup_idx <- union(which(repeat_str),which(repeat_nUPRN))
     duplicated_certificates <- as.data.table(certificates[dup_idx,])
     duplicated_certificates <- duplicated_certificates[order(UPRN,str_concat,ubdc_UPRN, INSPECTION_DATE),]
     #View(duplicated_certificates[,..check])# these duplicates seems fine
+    #duplicated_certificates[ n_UPRN == '10009711048',..check]
+    
     
     
     #Problem 1: Assigning UPRNs
@@ -92,18 +93,30 @@ for (LA in folders) {
     dict <-  dict[!duplicated(str_concat), ]
     dict <- setkey(as.data.table(dict), str_concat)
     
-    #### length(unique(dict$str_concat)) -> sometimes you can have m
+    
     duplicated_certificates  <- duplicated_certificates[,n_UPRN := dict[duplicated_certificates$str_concat, 'n_UPRN']] 
     
     
     #Problem 2: Identifing First/Last Observations
-    View(duplicated_certificates[order(n_UPRN, str_concat), c('str_concat','n_UPRN','INSPECTION_DATE')])
+    View(duplicated_certificates[order(n_UPRN, str_concat, INSPECTION_DATE), c('str_concat','n_UPRN','INSPECTION_DATE')])
 
     
+    
+    
+    
+    
+    
+    
+    
     #issue:
+    testcase <- certificates[n_UPRN == '10009711003', c('str_concat','n_UPRN')]
+    testcase$n_UPRN[1] == testcase$n_UPRN[2]
+    duplicated(testcase$n_UPRN)|duplicated(testcase$n_UPRN, fromLast = T) 
+    
+    
     certificates[n_UPRN == '10009711003', c('str_concat','n_UPRN')]
     duplicated_certificates[n_UPRN == '10009711003', c('str_concat','n_UPRN')]
-    duplicated(certificates[n_UPRN == '10009711003',c('str_concat','n_UPRN')]$n_UPRN)|duplicated(certificates[n_UPRN == '10009711003',c('str_concat','n_UPRN')]$n_UPRN, fromLast = T)
+    
     
     
     
@@ -115,6 +128,8 @@ for (LA in folders) {
     dup_idx_LUT <- which(duplicated(certificates[!is.na(certificates$ubdc_UPRN)]$ubdc_UPRN) | duplicated( certificates[!is.na(certificates$ubdc_UPRN)]$ubdc_UPRN, fromLast = TRUE))
     ###get index of possible duplicates
     dup_idx <- union(dup_idx_str,dup_idx_UPRN) 
+    
+    
     
     
     ###create dataframe of duplicates
