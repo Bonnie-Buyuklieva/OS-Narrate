@@ -127,7 +127,7 @@ print(paste('loop time:', Sys.time() - start.time))
 #summary: UPRNS alone took 3h+  to complete. Creating dupsdf of 3.9GB 
 #names(folders_meta_dups) <- c('folder', 'totalRows', 'NA_uprn', 'ubdc_link_uniq')
 #write.csv(folders_meta_dups, '../Outputs/folders_meta_dups_ubdc_link_uniq.csv')
-save(udbc_UPRN, file = '../Data/WIP_udbc_UPRN.RData')
+#save(udbc_UPRN, file = '../Data/WIP_udbc_UPRN.RData')
 
 names(folders_meta_dups) <- c('folder', 'totalRows', 'NA_uprn','str_uniq', 'uprn_uniq', 'udbcUPRN_uniq')
 
@@ -143,7 +143,6 @@ load(file = 'C:/Users/billi/Dropbox/_PhD/Application Documents/CASA RA/RA OS NAR
 
 load(file = 'C:/Users/billi/Dropbox/_PhD/Application Documents/CASA RA/RA OS NARRATE CASA/Data/MetaData&StringDups.RData')
 ```
-
 
 
 

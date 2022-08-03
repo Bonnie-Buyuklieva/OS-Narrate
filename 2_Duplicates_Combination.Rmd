@@ -1,0 +1,141 @@
+---
+title: "Duplicates Identification on V10"
+author: "Boyana Buyuklieva"
+date: "Aug 1st, 2022"
+output: html_document
+---
+
+
+
+
+```{r setup, include=FALSE, echo = T}
+knitr::opts_chunk$set(echo = TRUE)
+start.time <- Sys.time()
+#generated over several hours through: 2_Duplicate_linear-TC_V2.Rmd 
+
+load(file = '../Data/WIP_UPRN.RData')
+
+load(file = '../Data/WIP_udbc_UPRN.RData')
+
+load(file = '../Data/MetaData&StringDups.RData')
+print(paste('time to load:', Sys.time() - start.time))
+```
+
+
+```{r}
+library("data.table")
+
+dt_strdups <- setDT(str_dups[, names(UPRN)]) #2mins
+dt_strdups <- data.table(dt_strdups, key = "LMK_KEY") 
+
+#remove the NAs 
+dt_udbc_UPRN <- data.table(setDT(udbc_UPRN[!is.na(udbc_UPRN$ ),names(UPRN)]), key = "LMK_KEY") 
+
+
+deleteme <- rbindlist(list(head(dt_strdups, 5),tail(dt_strdups, 5)), use.names=TRUE)
+
+
+#testing
+object.size(UPRN)
+tracemem(UPRN)
+tmp <- head(UPRN, 500)
+untracemem(UPRN)
+
+
+
+tracemem(tmp)
+tmp <- tmp[!is.na(tmp$UPRN),]
+
+is.na(tmp$UPRN)
+
+```
+
+
+
+```{r}
+#Using RData files because running the LUT and duplicate matching will take hours. For every UPRN match, I will remove the NAs of its match. Then
+
+```
+
+
+
+
+
+
+
+
+
+```{r define_engineered-features, cache=TRUE}
+start.time <- Sys.time()
+
+
+#flag first entries   
+tmp$n_firstEntry <- F
+firstEntry <-which(!duplicated(tmp$combined)) #3539058
+tmp$n_firstEntry[firstEntry] <- T 
+rm(firstEntry)
+
+#set up the time column, relative to Inspection Date
+tmp$n_deltaDays <-  0
+
+#Delta(ER)
+#might cause problems without trimming white spaces and caps
+tmp$n_dER <- as.numeric(factor(tmp$CURRENT_ENERGY_RATING, 
+                       ordered = T, levels = c('A','B','C','D','E','F','G')))
+tmp$n_dEE <- tmp$CURRENT_ENERGY_EFFICIENCY
+
+
+print(paste('runtime:', Sys.time() - start.time))#2 mins
+```
+
+```{r checks}
+checks <- c("n_IDx","n_firstEntry","combined",
+            "INSPECTION_DATE","n_deltaDays",
+            "CURRENT_ENERGY_RATING","n_dER",
+            "CURRENT_ENERGY_EFFICIENCY","n_dEE",
+            "LMK_KEY","LOCAL_AUTHORITY")
+```
+
+
+
+
+#Simplified Version of Deltas
+
+```{r solved_faster}
+
+testingN <- length(tmp$combined)
+# testingN <- 50000
+
+start.time <- Sys.time()
+tester <- head(tmp,testingN)
+
+
+#vector giving  start of the repeats / group 
+rangeStarts <- numeric(testingN)
+for (row in tester$n_IDx) {
+  
+  if (tester$n_firstEntry[row] == T) {
+    groupStart <- row
+  }
+  
+  rangeStarts[row] <- groupStart
+} 
+print(paste('loop runtime:', Sys.time() - start.time)) # (.2 sec / 5k)  (20s / 8M)
+
+
+
+start.time <- Sys.time()
+tester$n_dER <- tester$n_dER[rangeStarts] - tester$n_dER # factor as numbers
+tester$n_dEE <- tester$n_dEE - tester$n_dEE[rangeStarts]
+tester$n_deltaDays <- as.numeric(difftime(tester$INSPECTION_DATE, tester$INSPECTION_DATE[rangeStarts], units = c("days"))) 
+print(paste('operation runtime:', Sys.time() - start.time)) # (0.01 sec / 5k) (.5 / 8M)
+
+
+print(paste('runtime:', Sys.time() - start.time)) # (approx 60s / 8 m)
+
+#View(tester[,checks])
+
+```
+
+
+

@@ -1,0 +1,347 @@
+---
+title: "Duplicate (strings) EPCs in V10"
+author: "Boyana Buyuklieva"
+date: "May 20, 2022"
+output: html_document
+---
+
+#This version is has linear time complexity. 
+
+```{r setup, include=FALSE, echo = T}
+knitr::opts_chunk$set(echo = TRUE)
+library(data.table)
+library(readr)
+library(microbenchmark)
+library(ggplot2)
+options(scipen=999)
+
+#get folders
+folders <- list.files(path = "../Data/all-domestic-certificates", pattern = NULL, all.files = FALSE,
+           full.names = FALSE, recursive = FALSE,
+           ignore.case = FALSE, include.dirs = FALSE, no.. = FALSE)
+folders <- folders[-342] #remove the .txt
+
+
+regional_LUT <- fread("../Data/folders_geography_LUT.csv")
+setkey(regional_LUT, "Folder")
+
+start.time <- Sys.time()
+ubdc_LUT <- fread("../Data/ubdc_link.csv",  select = c("lmk_key","ubdc_uprn"))
+setkey(ubdc_LUT,lmk_key)
+print(paste('fread:', Sys.time() - start.time)) #aprox 7 mins
+
+
+checks <- c("INSPECTION_DATE","CURRENT_ENERGY_RATING","CURRENT_ENERGY_EFFICIENCY","LMK_KEY","ubdc_UPRN")
+
+```
+
+
+
+
+# Duplicate Defintion Testing
+```{r loop}
+dups <- data.frame()
+counter = 0
+
+LA= folders[2]
+start.time <- Sys.time()
+for (LA in folders) {
+  
+  if( counter %% 20 == 0){print(LA)} 
+
+    certificates <- fread(paste0("../Data/all-domestic-certificates/",LA,"/certificates.csv"))
+    #setkey(certificates, LMK_KEY) #might not be needed
+    
+    
+    #Create the Longitudinal Dataset
+    ##LUT dups
+    tmp <- ubdc_LUT[certificates$LMK_KEY, 'ubdc_uprn']
+    certificates[,ubdc_UPRN := tmp]
+    
+    ##combined str dups
+    certificates[,str_concat := paste(ADDRESS, POSTCODE)]
+
+    ###..make col n_UPRN where this would UPRN, or ubdc_UPRN where its missing
+    certificates[ , n_UPRN := UPRN]
+    certificates[ is.na(n_UPRN),  n_UPRN := ubdc_UPRN]
+    
+    
+    repeat_str <- duplicated(certificates$str_concat)|duplicated(certificates$str_concat, fromLast = T)
+    
+    
+    repeat_nUPRN <- duplicated(certificates$n_UPRN)|duplicated(certificates$n_UPRN, fromLast = T) 
+    NA_nUPRN <- which(is.na(certificates$n_UPRN))# remove nas that slip through as duplicates
+    repeat_nUPRN <- setdiff(which(repeat_nUPRN),NA_nUPRN)
+ 
+    
+    dup_idx <- union(which(repeat_str),repeat_nUPRN)
+    duplicated_certificates <- as.data.table(certificates[dup_idx,])
+    duplicated_certificates <- duplicated_certificates[order(UPRN,str_concat,ubdc_UPRN, INSPECTION_DATE),]
+    #View(duplicated_certificates[,..check])# these duplicates seems fine
+    
+    
+    #Problem 1: Assigning UPRNs
+    ##CASE 1: idential string address repeats with UPRN value sometimes missing
+    ## example: "domestic-E06000001-Hartlepool":'Mount Oswald Nursing Home, 16 Hutton Avenue TS26 9PN'
+    dict <- duplicated_certificates[ !is.na(n_UPRN), c('str_concat','n_UPRN','INSPECTION_DATE')]
+    
+    ##CASE 2: idential string address repeats with different UPRN values
+    ## example: "domestic-E06000001-Hartlepool":"Gospel Hall, 32 Town Wall TS24 0JQ"
+    ## resolution is to assume the most recent UPRN to be right one
+    dict <-  dict[order(-INSPECTION_DATE), c('str_concat','n_UPRN')]
+    dict <-  dict[!duplicated(str_concat), ]
+    dict <- setkey(as.data.table(dict), str_concat)
+    
+    #### length(unique(dict$str_concat)) -> sometimes you can have m
+    duplicated_certificates  <- duplicated_certificates[,n_UPRN := dict[duplicated_certificates$str_concat, 'n_UPRN']] 
+    
+    
+    #Problem 2: Identifing First/Last Observations
+    View(duplicated_certificates[order(n_UPRN, str_concat), c('str_concat','n_UPRN','INSPECTION_DATE')])
+
+    
+    #issue:
+    certificates[n_UPRN == '10009711003', c('str_concat','n_UPRN')]
+    duplicated_certificates[n_UPRN == '10009711003', c('str_concat','n_UPRN')]
+    duplicated(certificates[n_UPRN == '10009711003',c('str_concat','n_UPRN')]$n_UPRN)|duplicated(certificates[n_UPRN == '10009711003',c('str_concat','n_UPRN')]$n_UPRN, fromLast = T)
+    
+    
+    
+    
+    
+    ###Identify the type of duplicate
+    dup_idx_str <- which(duplicated(certificates$str_concat) | duplicated(certificates$str_concat, fromLast = TRUE))
+    dup_idx_UPRN <- which(duplicated(certificates[!is.na(certificates$UPRN)]$UPRN) | duplicated( certificates[!is.na(certificates$UPRN)]$UPRN, fromLast = TRUE))
+    dup_idx_LUT <- which(duplicated(certificates[!is.na(certificates$ubdc_UPRN)]$ubdc_UPRN) | duplicated( certificates[!is.na(certificates$ubdc_UPRN)]$ubdc_UPRN, fromLast = TRUE))
+    ###get index of possible duplicates
+    dup_idx <- union(dup_idx_str,dup_idx_UPRN) 
+    
+    
+    ###create dataframe of duplicates
+    duplicated_certificates <- certificates[dup_idx]
+    duplicated_certificates <- duplicated_certificates[order(str_concat,UPRN,ubdc_UPRN, INSPECTION_DATE),]
+    ###..make col n_UPRN where this would UPRN, or ubdc_UPRN where its missing
+    duplicated_certificates[ , n_UPRN := UPRN]
+    duplicated_certificates[ is.na(n_UPRN),  n_UPRN := ubdc_UPRN]
+
+    
+    
+
+    check <- c('str_concat', 'UPRN','ubdc_UPRN')
+    check <- c('str_concat', 'n_UPRN','UPRN','ubdc_UPRN')
+    View(duplicated_certificates[repeat_str,..check])
+    
+    
+    
+    repeat_str <- duplicated(duplicated_certificates$str_concat)|duplicated(duplicated_certificates$str_concat, fromLast = T)
+    repeat_nUPRN <- duplicated(duplicated_certificates$n_UPRN)|duplicated(duplicated_certificates$n_UPRN, fromLast = T)
+    
+    
+    #repeat_nUPRN <- duplicated(duplicated_certificates[!repeat_str,..check]$n_UPRN)|duplicated(duplicated_certificates[!repeat_str,..check]$n_UPRN, fromLast = T)
+    repeats_clean <- union(which(repeat_str), which(repeat_nUPRN))
+    
+    #ideal data
+    View(duplicated_certificates[repeats_clean, ..check]) 
+    
+    #not sure 
+    View(duplicated_certificates[!repeats_clean, ..check])
+    tmp <- duplicated_certificates[!repeats_clean, ..check]
+    View(cbind(tmp,duplicated(tmp$n_UPRN) )) #includes values wher the n_UPRN is duplicated
+    
+    
+    
+    
+    
+    test_non_repeatstr <- duplicated_certificates[!repeat_str, ..check]
+    test_non_repeatstr <- test_non_repeatstr[order(UPRN,ubdc_UPRN),]
+    View(test_non_repeatstr)
+    
+    
+    
+    
+    #create new columns for the RGN & LAD
+    r_LAD <- regional_LUT[LA]$LAD11NM
+    r_region <- regional_LUT[LA]$RGN11NM
+    r_UPRNmismatch <- sum(which(certificates[, ubdc_UPRN != UPRN ]))
+    
+    certificates[,RGN11NM := r_region]
+    certificates[,LAD11NM := r_LAD]
+    
+    #Create the metadata
+    row<- data.table(r_LAD,
+                     N = lengths(certificates)[1],
+                     naUPRN = sum(is.na(certificates$UPRN)),
+                     diffUPRN_LUTpriority = #both !is.na(), but different values 
+                     r_region, LA )
+    
+    
+    
+    
+   
+    
+    
+      
+  #Add the dups counts at folder level
+  row <- cbind(row,length(certificates$LMK_KEY) )#denominator
+  #Count empty UPRNs 
+  row <- cbind(row,sum(is.na(certificates$UPRN)))  
+  
+    
+  if(F){
+  ###Dups df #######################################
+  ##Baseline: by string match
+  certificates$combined <- paste0(certificates$ADDRESS, certificates$POSTCODE) #measure of repeat entry here
+  tmpdups <- certificates[duplicated(certificates$combined) | duplicated(certificates$combined, fromLast = TRUE),]
+  tmpdups <- tmpdups[order(tmpdups$combined, tmpdups$INSPECTION_DATE),]
+  str_dups <- rbind(str_dups,tmpdups)
+  row <- cbind(row, length(tmpdups$LMK_KEY)) 
+  
+  
+  #Based on UPRNs
+  tmpdups1 <- certificates[duplicated(certificates$UPRN) | duplicated(certificates$UPRN, fromLast = TRUE),]
+  uprn_dups <- rbind(uprn_dups,tmpdups1)
+  
+
+  row <- cbind(row, length(tmpdups1$LMK_KEY) ) 
+    }
+    
+  #DIRECTIONS TO EXPLORE
+  #certificates$udbc_UPRN <- ubdc_link$ubdc_uprn[bsearch(certificates$LMK_KEY, ubdc_link$lmk_key)]
+  #binsearch / gtools
+  #make ubdc_link$ubdc_uprn  a data.table , then setkey(data.table, key)  // touch by data.table[key]
+  #test!
+  #library(Dict)
+  #ages <- Dict$new(ubdc_link$lmk_key,ubdc_link$ubdc_uprn)
+  #Manual Based on V9 LUT:
+  #start.time <- Sys.time()
+  
+  
+  certificates$udbc_UPRN <- ubdc_link$ubdc_uprn[match(certificates$LMK_KEY, ubdc_link$lmk_key)]
+  tmpdups2_2 <- certificates[duplicated(certificates$udbc_UPRN) | duplicated(certificates$udbc_UPRN, fromLast = TRUE),]
+  udbc_UPRN <- rbind(udbc_UPRN,tmpdups2_2)
+  #print(paste('time without unlist:', Sys.time() - start.time)) #"time without unlist: 3.05"
+  row <- cbind(row, length(tmpdups2_2$LMK_KEY)) 
+  
+  folders_meta_dups <-rbind(folders_meta_dups, row)
+  
+  rm(tmpdups2_2,row)
+  #rm(tmpdups,tmpdups1,tmpdups2_2,row)
+  #gc()
+  
+  counter = counter + 1
+}
+print(paste('loop time:', Sys.time() - start.time))
+#summary: UPRNS alone took 2h15 mins to complete. Creating dupsdf of 3.9GB 
+#summary: UPRNS alone took 3h+  to complete. Creating dupsdf of 3.9GB 
+#names(folders_meta_dups) <- c('folder', 'totalRows', 'NA_uprn', 'ubdc_link_uniq')
+#write.csv(folders_meta_dups, '../Outputs/folders_meta_dups_ubdc_link_uniq.csv')
+#save(udbc_UPRN, file = '../Data/WIP_udbc_UPRN.RData')
+
+names(folders_meta_dups) <- c('folder', 'totalRows', 'NA_uprn','str_uniq', 'uprn_uniq', 'udbcUPRN_uniq')
+
+
+```
+
+
+
+
+
+# Feature Engineering Set-Up
+
+```{r heavyload, cache=TRUE}
+start.time <- Sys.time()
+
+
+#loads str_dups [7 847 301]
+load(file = './MetaData&StringDups.RData')
+
+#Df of all rows that repeat
+tmp <- str_dups[,subsetCols ]
+rm(str_dups)
+
+##memory.size()
+gc()#collect garbage 
+
+
+#order by similarity & date
+dupcol <- 'combined'
+date <- 'INSPECTION_DATE'
+
+tmp <- tmp[order(tmp[,dupcol],tmp[,date]),]
+#create a faster key, based on the order
+tmp$n_IDx <- seq(1,length(tmp$LMK_KEY),1)
+
+
+print(paste('time to load:', Sys.time() - start.time))#9 mins
+```
+
+```{r define_engineered-features, cache=TRUE}
+start.time <- Sys.time()
+
+
+#flag first entries   
+tmp$n_firstEntry <- F
+firstEntry <-which(!duplicated(tmp$combined)) #3539058
+tmp$n_firstEntry[firstEntry] <- T 
+rm(firstEntry)
+
+#set up the time column, relative to Inspection Date
+tmp$n_deltaDays <-  0
+
+#Delta(ER)
+#might cause problems without trimming white spaces and caps
+tmp$n_dER <- as.numeric(factor(tmp$CURRENT_ENERGY_RATING, 
+                       ordered = T, levels = c('A','B','C','D','E','F','G')))
+tmp$n_dEE <- tmp$CURRENT_ENERGY_EFFICIENCY
+
+
+print(paste('runtime:', Sys.time() - start.time))#2 mins
+```
+
+
+
+
+
+
+
+
+#Simplified Version of Deltas
+
+```{r solved_faster}
+
+testingN <- length(tmp$combined)
+# testingN <- 50000
+
+start.time <- Sys.time()
+tester <- head(tmp,testingN)
+
+
+#vector giving  start of the repeats / group 
+rangeStarts <- numeric(testingN)
+for (row in tester$n_IDx) {
+  
+  if (tester$n_firstEntry[row] == T) {
+    groupStart <- row
+  }
+  
+  rangeStarts[row] <- groupStart
+} 
+print(paste('loop runtime:', Sys.time() - start.time)) # (.2 sec / 5k)  (20s / 8M)
+
+
+
+start.time <- Sys.time()
+tester$n_dER <- tester$n_dER[rangeStarts] - tester$n_dER # factor as numbers
+tester$n_dEE <- tester$n_dEE - tester$n_dEE[rangeStarts]
+tester$n_deltaDays <- as.numeric(difftime(tester$INSPECTION_DATE, tester$INSPECTION_DATE[rangeStarts], units = c("days"))) 
+print(paste('operation runtime:', Sys.time() - start.time)) # (0.01 sec / 5k) (.5 / 8M)
+
+
+print(paste('runtime:', Sys.time() - start.time)) # (approx 60s / 8 m)
+
+#View(tester[,checks])
+
+```
+
+
+

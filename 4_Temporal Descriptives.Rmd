@@ -34,3 +34,19 @@ print(paste('runtime:', Sys.time() - start.time))
 write.csv( subset(tmp, tmp$appears>9), file = '../Outputs/WIP_appearance_matrix_over_9.csv')
 ```
 
+
+
+
+```{r Added220801}
+start.time <- Sys.time()
+sorted_udbc_UPRN <- udbc_UPRN[order(udbc_UPRN$udbc_UPRN, udbc_UPRN$INSPECTION_DATE),]
+print(paste('sorted_udbc_UPRN runtime:', Sys.time() - start.time))#3.7183694322904
+
+
+start.time <- Sys.time()
+sorted_UPRN <- UPRN[order(UPRN$UPRN, UPRN$INSPECTION_DATE),]
+print(paste('UPRN runtime:', Sys.time() - start.time))# 5.56712331771851
+
+
+```
+
