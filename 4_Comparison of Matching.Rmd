@@ -1,0 +1,42 @@
+---
+title: "4_Comparison of Matched"
+author: "Boyana Buyuklieva"
+date: "June 27, 2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r cache = T}
+
+if(F){
+load(file = 'C:/Users/billi/Dropbox/_PhD/Application Documents/CASA RA/RA OS NARRATE CASA/Data/WIP_UPRN.RData')
+
+load(file = 'C:/Users/billi/Dropbox/_PhD/Application Documents/CASA RA/RA OS NARRATE CASA/Data/WIP_udbc_UPRN.RData')
+
+load(file = 'C:/Users/billi/Dropbox/_PhD/Application Documents/CASA RA/RA OS NARRATE CASA/Data/MetaData&StringDups.RData') 
+}
+
+```
+
+
+```{r}
+
+test <- head(UPRN, 3000)
+test <- test[  order( test[,"UPRN"], test[,"INSPECTION_DATE"] , decreasing = T),] 
+
+toRemove <- test[duplicated(test$UPRN) | duplicated(test$UPRN, fromLast = TRUE),]
+
+
+```
+
+
+```{r}
+start.time <- Sys.time()
+s_UPRN <- UPRN[  order( UPRN[,"UPRN"], UPRN[,"INSPECTION_DATE"] ),]
+print(paste('UPRN sort time:', Sys.time() - start.time))
+
+```
+

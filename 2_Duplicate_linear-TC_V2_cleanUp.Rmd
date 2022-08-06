@@ -44,14 +44,16 @@ checks <- c("INSPECTION_DATE","CURRENT_ENERGY_RATING","CURRENT_ENERGY_EFFICIENCY
 
 # Duplicate Defintion Testing
 ```{r loop}
-mapping_blacklist <- list()
-#counter = 0
+crosssectionalEPCs_byRGN <- list()
+longitudinalEPCs_long <- list()
+#counter:
+#print_counter = 0
 
 LA= folders[2]
 start.time <- Sys.time()
 for (LA in folders) {
   
-  #if( counter %% 20 == 0){print(LA)} 
+  #if( print_counter %% 20 == 0){print(LA)} 
   print(LA)
   certificates <- fread(paste0("../Data/all-domestic-certificates/",LA,"/certificates.csv"),
                         colClasses = c(       #'LMK_KEY' = 'character', 
@@ -72,6 +74,7 @@ for (LA in folders) {
     
 
     #Create the Longitudinal Dataset
+    #-------------------------------------------------------------------------------------------------------------------------------
     ##LUT dups
     tmp <- ubdc_LUT[certificates$LMK_KEY, 'ubdc_uprn']
     certificates[,ubdc_UPRN := tmp]
@@ -116,46 +119,47 @@ for (LA in folders) {
     duplicated_certificates$n_GRP <-ifelse(is.na(duplicated_certificates$n_UPRN), duplicated_certificates$str_concat, duplicated_certificates$n_UPRN )
     #View(duplicated_certificates[, c('n_GRP','str_concat','n_UPRN','INSPECTION_DATE')])
     
+    #Output: Append to long list
+    longitudinalEPCs_long<- rbindlist(list(longitudinalEPCs_long,duplicated_certificates ))
+    #-------------------------------------------------------------------------------------------------------------------------------
     
-    #Problem 2: Identifing all repeats, except the latest observations to create blacklist
+    #Create the Crossectional Dataset (include only most recent obvervations of repeat entries)
+    #------------------------------------------------------------------------------------------------------------------------------
+    ###Problem 2: Identifing all repeats, except the latest observations to create blacklist
+    
+    
     tmp_mapping_blacklist <- as.data.table(duplicated_certificates[which( !duplicated(duplicated_certificates$n_GRP) ),]$LMK_KEY )
+    tmp_mapping <- certificates[!certificates$LMK_KEY %in% tmp_mapping_blacklist$V1,] #keep those outside the blacklist
     
-    mapping_blacklist <- rbindlist(list(mapping_blacklist,tmp_mapping_blacklist ))
+    ## Create a list of places by region:
+    ####NOTE: assumes the regions will be seen in order
+    r_region <- regional_LUT[LA]$RGN11NM
+    if(LA == folders[1]){
+      previous_region <- r_region
+      mapping <- list() 
+    }
+    
+    if(r_region == previous_region){
+      mapping <- rbindlist(list(mapping,tmp_mapping ))
+      
+    }else if(r_region != previous_region){
+      crosssectionalEPCs_byRGN[[previous_region]] <- mapping
+      
+      mapping <- list()  
+      mapping <- rbindlist(list(mapping,tmp_mapping ))
+      previous_region<- regional_LUT[LA]$RGN11NM  
+    }
+   #------------------------------------------------------------------------------------------------------------------------------
+    
+   #Create the Crossectional Meta-dataset
+
 }
 print(paste('loop time:', Sys.time() - start.time))
 
 
 
-test <- list()
-region <- regional_LUT[LA]$RGN11NM
-
-test[[]] <- tmp_mapping_blacklist
-
-if(LA = folders[1]){
-  
-}
 
 
-#set the regions counter
-region <- regional_LUT[folders[1]]$RGN11NM
-
-
-#if you are still in the same region, write to the same table
-if(region == regional_LUT[folders[LA]]$RGN11NM){
-  
-}else{
-    region <- regional_LUT[folders[LA]]$RGN11NM 
-  #reset the blacklist
-  #resent the duplicate list
-  #reset the unique
-
-  }
-
-
-
-
-
-      
 if(F){
       
     which(duplicated_certificates[!is.na(n_UPRN)]$n_UPRN)
@@ -183,7 +187,6 @@ if(F){
     
     
     #create new columns for the RGN & LAD
-    r_LAD <- regional_LUT[LA]$LAD11NM
     r_region <- regional_LUT[LA]$RGN11NM
     r_UPRNmismatch <- sum(which(certificates[, ubdc_UPRN != UPRN ]))
     
