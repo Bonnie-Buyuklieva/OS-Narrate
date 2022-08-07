@@ -1,5 +1,5 @@
 ---
-title: "Duplicate (strings) EPCs in V10"
+title: "Duplicate EPCs in V10"
 author: "Boyana Buyuklieva"
 date: "May 20, 2022"
 output: html_document
@@ -44,17 +44,12 @@ checks <- c("INSPECTION_DATE","CURRENT_ENERGY_RATING","CURRENT_ENERGY_EFFICIENCY
 
 # Duplicate Defintion Testing
 ```{r loop}
-crosssectionalEPCs_byRGN <- list()
 longitudinalEPCs_long <- list()
-#counter:
-#print_counter = 0
 
-LA= folders[2]
 start.time <- Sys.time()
 for (LA in folders) {
   
-  #if( print_counter %% 20 == 0){print(LA)} 
-  print(LA)
+  #print(LA)
   certificates <- fread(paste0("../Data/all-domestic-certificates/",LA,"/certificates.csv"),
                         colClasses = c(       #'LMK_KEY' = 'character', 
                                               'LODGEMENT_DATETIME' = 'character',
@@ -70,8 +65,11 @@ for (LA in folders) {
                                               'CONSTITUENCY_LABEL' = 'character',
                                               'TRANSACTION_TYPE' = 'character',
                                               'TENURE' = 'character'))
-    #setkey(certificates, LMK_KEY) #might not be needed
-    
+  
+    r_region <- regional_LUT[LA]$RGN11NM
+    certificates[,RGN11NM := r_region]
+    certificates[,LAD11NM := regional_LUT[LA]$LAD11NM]
+  
 
     #Create the Longitudinal Dataset
     #-------------------------------------------------------------------------------------------------------------------------------
@@ -131,9 +129,9 @@ for (LA in folders) {
     tmp_mapping_blacklist <- as.data.table(duplicated_certificates[which( !duplicated(duplicated_certificates$n_GRP) ),]$LMK_KEY )
     tmp_mapping <- certificates[!certificates$LMK_KEY %in% tmp_mapping_blacklist$V1,] #keep those outside the blacklist
     
+    
     ## Create a list of places by region:
     ####NOTE: assumes the regions will be seen in order
-    r_region <- regional_LUT[LA]$RGN11NM
     if(LA == folders[1]){
       previous_region <- r_region
       mapping <- list() 
@@ -143,230 +141,24 @@ for (LA in folders) {
       mapping <- rbindlist(list(mapping,tmp_mapping ))
       
     }else if(r_region != previous_region){
-      crosssectionalEPCs_byRGN[[previous_region]] <- mapping
-      
+      save(mapping, file = paste0("../Data/RData_crossSectional/crossSectional_",previous_region,".RData") )
+      save(longitudinalEPCs_long, file = paste0("../Data/RData_longitudinal/longitudinalEPCs_",previous_region,".RData") )
+      _
       mapping <- list()  
       mapping <- rbindlist(list(mapping,tmp_mapping ))
       previous_region<- regional_LUT[LA]$RGN11NM  
+      
+      
+      longitudinalEPCs_long <- list()
+      
+      print(previous_region)
     }
    #------------------------------------------------------------------------------------------------------------------------------
     
    #Create the Crossectional Meta-dataset
 
 }
-print(paste('loop time:', Sys.time() - start.time))
-
-
-
-
-
-if(F){
-      
-    which(duplicated_certificates[!is.na(n_UPRN)]$n_UPRN)
-    union( which(duplicated(duplicated_certificates$n_UPRN)), which(duplicated(duplicated_certificates$n_UPRN))
-    
-    
-    
-    ##check the maximum duplication of 'str_concat'
-    
-    
-    #issue:
-    testcase <- certificates[n_UPRN == '10009711003', c('str_concat','n_UPRN')]
-    testcase$n_UPRN[1] == testcase$n_UPRN[2]
-    duplicated(testcase$n_UPRN)|duplicated(testcase$n_UPRN, fromLast = T) 
-    
-    
-    certificates[n_UPRN == '10009711003', c('str_concat','n_UPRN')]
-    duplicated_certificates[n_UPRN == '10009711003', c('str_concat','n_UPRN')]
-    
-    
-    
-    
-  
-    
-    
-    
-    #create new columns for the RGN & LAD
-    r_region <- regional_LUT[LA]$RGN11NM
-    r_UPRNmismatch <- sum(which(certificates[, ubdc_UPRN != UPRN ]))
-    
-    certificates[,RGN11NM := r_region]
-    certificates[,LAD11NM := r_LAD]
-    
-    #Create the metadata
-    row<- data.table(r_LAD,
-                     N = lengths(certificates)[1],
-                     naUPRN = sum(is.na(certificates$UPRN)),
-                     diffUPRN_LUTpriority = #both !is.na(), but different values 
-                     r_region, LA )
-    
-    
-    
-    
-   
-    
-    
-      
-  #Add the dups counts at folder level
-  row <- cbind(row,length(certificates$LMK_KEY) )#denominator
-  #Count empty UPRNs 
-  row <- cbind(row,sum(is.na(certificates$UPRN)))  
-  
-    
-  if(F){
-  ###Dups df #######################################
-  ##Baseline: by string match
-  certificates$combined <- paste0(certificates$ADDRESS, certificates$POSTCODE) #measure of repeat entry here
-  tmpdups <- certificates[duplicated(certificates$combined) | duplicated(certificates$combined, fromLast = TRUE),]
-  tmpdups <- tmpdups[order(tmpdups$combined, tmpdups$INSPECTION_DATE),]
-  str_dups <- rbind(str_dups,tmpdups)
-  row <- cbind(row, length(tmpdups$LMK_KEY)) 
-  
-  
-  #Based on UPRNs
-  tmpdups1 <- certificates[duplicated(certificates$UPRN) | duplicated(certificates$UPRN, fromLast = TRUE),]
-  uprn_dups <- rbind(uprn_dups,tmpdups1)
-  
-
-  row <- cbind(row, length(tmpdups1$LMK_KEY) ) 
-    }
-    
-  #DIRECTIONS TO EXPLORE
-  #certificates$udbc_UPRN <- ubdc_link$ubdc_uprn[bsearch(certificates$LMK_KEY, ubdc_link$lmk_key)]
-  #binsearch / gtools
-  #make ubdc_link$ubdc_uprn  a data.table , then setkey(data.table, key)  // touch by data.table[key]
-  #test!
-  #library(Dict)
-  #ages <- Dict$new(ubdc_link$lmk_key,ubdc_link$ubdc_uprn)
-  #Manual Based on V9 LUT:
-  #start.time <- Sys.time()
-  
-  
-  certificates$udbc_UPRN <- ubdc_link$ubdc_uprn[match(certificates$LMK_KEY, ubdc_link$lmk_key)]
-  tmpdups2_2 <- certificates[duplicated(certificates$udbc_UPRN) | duplicated(certificates$udbc_UPRN, fromLast = TRUE),]
-  udbc_UPRN <- rbind(udbc_UPRN,tmpdups2_2)
-  #print(paste('time without unlist:', Sys.time() - start.time)) #"time without unlist: 3.05"
-  row <- cbind(row, length(tmpdups2_2$LMK_KEY)) 
-  
-  folders_meta_dups <-rbind(folders_meta_dups, row)
-  
-  rm(tmpdups2_2,row)
-  #rm(tmpdups,tmpdups1,tmpdups2_2,row)
-  #gc()
-  
-  counter = counter + 1
-}
-#summary: UPRNS alone took 2h15 mins to complete. Creating dupsdf of 3.9GB 
-#summary: UPRNS alone took 3h+  to complete. Creating dupsdf of 3.9GB 
-#names(folders_meta_dups) <- c('folder', 'totalRows', 'NA_uprn', 'ubdc_link_uniq')
-#write.csv(folders_meta_dups, '../Outputs/folders_meta_dups_ubdc_link_uniq.csv')
-#save(udbc_UPRN, file = '../Data/WIP_udbc_UPRN.RData')
-
-names(folders_meta_dups) <- c('folder', 'totalRows', 'NA_uprn','str_uniq', 'uprn_uniq', 'udbcUPRN_uniq')
-}
-
+print(paste('loop time:', Sys.time() - start.time))#"loop time: 3.63205520583524"
 ```
-
-
-
-
-
-# Feature Engineering Set-Up
-
-```{r heavyload, cache=TRUE}
-start.time <- Sys.time()
-
-
-#loads str_dups [7 847 301]
-load(file = './MetaData&StringDups.RData')
-
-#Df of all rows that repeat
-tmp <- str_dups[,subsetCols ]
-rm(str_dups)
-
-##memory.size()
-gc()#collect garbage 
-
-
-#order by similarity & date
-dupcol <- 'combined'
-date <- 'INSPECTION_DATE'
-
-tmp <- tmp[order(tmp[,dupcol],tmp[,date]),]
-#create a faster key, based on the order
-tmp$n_IDx <- seq(1,length(tmp$LMK_KEY),1)
-
-
-print(paste('time to load:', Sys.time() - start.time))#9 mins
-```
-
-```{r define_engineered-features, cache=TRUE}
-start.time <- Sys.time()
-
-
-#flag first entries   
-tmp$n_firstEntry <- F
-firstEntry <-which(!duplicated(tmp$combined)) #3539058
-tmp$n_firstEntry[firstEntry] <- T 
-rm(firstEntry)
-
-#set up the time column, relative to Inspection Date
-tmp$n_deltaDays <-  0
-
-#Delta(ER)
-#might cause problems without trimming white spaces and caps
-tmp$n_dER <- as.numeric(factor(tmp$CURRENT_ENERGY_RATING, 
-                       ordered = T, levels = c('A','B','C','D','E','F','G')))
-tmp$n_dEE <- tmp$CURRENT_ENERGY_EFFICIENCY
-
-
-print(paste('runtime:', Sys.time() - start.time))#2 mins
-```
-
-
-
-
-
-
-
-
-#Simplified Version of Deltas
-
-```{r solved_faster}
-
-testingN <- length(tmp$combined)
-# testingN <- 50000
-
-start.time <- Sys.time()
-tester <- head(tmp,testingN)
-
-
-#vector giving  start of the repeats / group 
-rangeStarts <- numeric(testingN)
-for (row in tester$n_IDx) {
-  
-  if (tester$n_firstEntry[row] == T) {
-    groupStart <- row
-  }
-  
-  rangeStarts[row] <- groupStart
-} 
-print(paste('loop runtime:', Sys.time() - start.time)) # (.2 sec / 5k)  (20s / 8M)
-
-
-
-start.time <- Sys.time()
-tester$n_dER <- tester$n_dER[rangeStarts] - tester$n_dER # factor as numbers
-tester$n_dEE <- tester$n_dEE - tester$n_dEE[rangeStarts]
-tester$n_deltaDays <- as.numeric(difftime(tester$INSPECTION_DATE, tester$INSPECTION_DATE[rangeStarts], units = c("days"))) 
-print(paste('operation runtime:', Sys.time() - start.time)) # (0.01 sec / 5k) (.5 / 8M)
-
-
-print(paste('runtime:', Sys.time() - start.time)) # (approx 60s / 8 m)
-
-#View(tester[,checks])
-
-```
-
 
 
