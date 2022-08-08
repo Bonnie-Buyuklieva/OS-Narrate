@@ -12,7 +12,7 @@ knitr::opts_chunk$set(echo = TRUE)
 library(data.table)
 library(readr)
 library(microbenchmark)
-library(ggplot2)
+library(fasttime)
 options(scipen=999)
 
 #get folders
@@ -45,11 +45,17 @@ checks <- c("INSPECTION_DATE","CURRENT_ENERGY_RATING","CURRENT_ENERGY_EFFICIENCY
 # Duplicate Defintion Testing
 ```{r loop}
 longitudinalEPCs_long <- list()
+print_counter = 0
+
+#using this instead of directory folders, to sort by region
+folders_sorted_by_regional_LUT <- regional_LUT[order(RGN11NM)]$Folder
 
 start.time <- Sys.time()
-for (LA in folders) {
+for (LA in folders_sorted_by_regional_LUT) {
   
-  #print(LA)
+  print_counter = print_counter+1
+  if(print_counter %% 20 == 0){print(LA)} 
+  
   certificates <- fread(paste0("../Data/all-domestic-certificates/",LA,"/certificates.csv"),
                         colClasses = c(       #'LMK_KEY' = 'character', 
                                               'LODGEMENT_DATETIME' = 'character',
@@ -66,11 +72,15 @@ for (LA in folders) {
                                               'TRANSACTION_TYPE' = 'character',
                                               'TENURE' = 'character'))
   
+    
+  
     r_region <- regional_LUT[LA]$RGN11NM
     certificates[,RGN11NM := r_region]
     certificates[,LAD11NM := regional_LUT[LA]$LAD11NM]
-  
-
+    
+    #convert to date.time
+    certificates[, INSPECTION_DATE := fastPOSIXct(INSPECTION_DATE, required.components = 3L)] #3 means only the date is required to a conversion to be valid
+    
     #Create the Longitudinal Dataset
     #-------------------------------------------------------------------------------------------------------------------------------
     ##LUT dups
@@ -141,24 +151,24 @@ for (LA in folders) {
       mapping <- rbindlist(list(mapping,tmp_mapping ))
       
     }else if(r_region != previous_region){
+      print(previous_region)
+      print(LA)
+      
       save(mapping, file = paste0("../Data/RData_crossSectional/crossSectional_",previous_region,".RData") )
       save(longitudinalEPCs_long, file = paste0("../Data/RData_longitudinal/longitudinalEPCs_",previous_region,".RData") )
-      _
       mapping <- list()  
       mapping <- rbindlist(list(mapping,tmp_mapping ))
       previous_region<- regional_LUT[LA]$RGN11NM  
       
       
       longitudinalEPCs_long <- list()
-      
-      print(previous_region)
     }
    #------------------------------------------------------------------------------------------------------------------------------
     
    #Create the Crossectional Meta-dataset
 
 }
-print(paste('loop time:', Sys.time() - start.time))#"loop time: 3.63205520583524"
+print(paste('loop time:', Sys.time() - start.time))#"loop time: 2.35320606278049"
 ```
 
 
