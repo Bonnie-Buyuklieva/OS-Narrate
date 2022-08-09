@@ -1,0 +1,109 @@
+---
+title: "Checkers_Scratchpad"
+author: "Boyana Buyuklieva"
+date: "August 9, 2022"
+output: html_document
+---
+
+
+```{r check}
+#327 LAD, 10 + 1 regions
+check <- data.frame()
+
+loadRData <- function(fileName){
+    #loads an RData file, and returns it
+    load(fileName)
+    get(ls()[ls() != "fileName"])
+}
+
+long_data <- list.files(path = "../Data/RData_longitudinal", pattern = NULL, all.files = FALSE,
+           full.names = FALSE, recursive = FALSE,
+           ignore.case = FALSE, include.dirs = FALSE, no.. = FALSE)
+
+for (region in long_data) {
+    tmp_region_dt <- loadRData(paste0("../Data/RData_longitudinal/",region) )
+    
+   for(LA in unique(tmp_region_dt[, LAD11NM]) ){ 
+     check <- rbind(check, cbind(region, LA))
+     
+   }
+}
+```
+
+```{r check1}
+longitudinalEPCs_long <- data.frame()
+print_counter = 0
+
+#using this instead of directory folders, to sort by region
+regional_LUT <- fread("../Data/folders_geography_LUT.csv")
+folders_sorted_by_regional_LUT <- regional_LUT[order(RGN11NM)]$Folder
+
+#replaces the if statement
+previous_region <- regional_LUT[order(RGN11NM)]$RGN11NM[1]
+  
+
+  
+  
+start.time <- Sys.time()
+for (LA in folders_sorted_by_regional_LUT) {
+
+  
+  #print(LA)
+  folder <- LA
+  regionID <- which(regional_LUT$Folder == LA)
+  current_region <- regional_LUT[regionID]$RGN11NM
+  
+      if(current_region == previous_region){
+      print('in: current_region == previous_region')
+    }else if(current_region != previous_region){
+      longitudinalEPCs_long <- rbind(longitudinalEPCs_long, c('-------', '-------', '-------' ))
+      previous_region<- current_region  
+    }
+  
+  
+  #print_counter = print_counter+1
+  #if(print_counter %% 20 == 0){print(LA)} 
+ 
+  row <- c( previous_region, current_region, LA )
+  longitudinalEPCs_long <- rbind(longitudinalEPCs_long, row, stringsAsFactors = FALSE)
+  names(longitudinalEPCs_long) <- c('previous_region','current_region','LAD')    
+
+  }
+  
+print(paste('loop time:', Sys.time() - start.time))#"loop time: 2.35320606278049"
+```
+
+```{r}
+ #print_counter = print_counter+1
+  #if(print_counter %% 20 == 0){print(LA)} 
+  if(F){
+    certificates <- fread(paste0("../Data/all-domestic-certificates/",LA,"/certificates.csv"),
+                        colClasses = 'character',
+                        select = 'LOCAL_AUTHORITY_LABEL')
+  
+
+    
+    ## Create a list of places by region:
+    ####NOTE: assumes the regions will be seen in order
+    if(LA == folders_sorted_by_regional_LUT[1]){
+      previous_region <- r_region
+      print('in: folders_sorted_by_regional_LUT[1]')
+    }
+    
+    if(r_region == previous_region){
+    longitudinalEPCs_long <- rbind(longitudinalEPCs_long, row)
+    print('in: r_region == previous_region')
+      
+    }else if(r_region != previous_region){
+      
+      print(previous_region)
+      previous_region<- regional_LUT[LA]$RGN11NM  
+      
+      longitudinalEPCs_long <- rbind(longitudinalEPCs_long, c('-------', '-------' ))
+      longitudinalEPCs_long <- rbind(longitudinalEPCs_long, row)
+     print('in: r_region != previous_region') 
+     
+    }
+   #------------------------------------------------------------------------------------------------------------------------------
+}
+```

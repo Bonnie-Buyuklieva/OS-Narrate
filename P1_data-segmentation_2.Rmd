@@ -22,7 +22,9 @@ folders <- list.files(path = "../Data/all-domestic-certificates", pattern = NULL
 folders <- folders[-342] #remove the .txt
 
 
+#TEST!
 regional_LUT <- fread("../Data/deleteMe_folders_geography_LUT.csv")
+
 setkey(regional_LUT, "Folder")
 
 start.time <- Sys.time()
@@ -49,6 +51,10 @@ print_counter = 0
 
 #using this instead of directory folders, to sort by region
 folders_sorted_by_regional_LUT <- regional_LUT[order(RGN11NM)]$Folder
+#replaces the if statement
+previous_region <- regional_LUT[order(RGN11NM)]$RGN11NM[1]
+mapping <- list() 
+
 
 start.time <- Sys.time()
 for (LA in folders_sorted_by_regional_LUT) {
@@ -75,10 +81,26 @@ for (LA in folders_sorted_by_regional_LUT) {
                                               'TENURE' = 'character'))
   
     
-  
-    r_region <- regional_LUT[LA]$RGN11NM
-    certificates[,RGN11NM := r_region]
-    certificates[,LAD11NM := regional_LUT[LA]$LAD11NM]
+    id <- which(regional_LUT$Folder == LA)
+    current_region <- regional_LUT[id]$RGN11NM
+    certificates[,RGN11NM := current_region]
+    certificates[,LAD11NM := regional_LUT[id]$LAD11NM]
+    
+    
+    if(current_region != previous_region){
+      save(mapping, file = paste0("../Data/RData_crossSectional/crossSectional_",previous_region,".RData") )
+      save(longitudinalEPCs_long, file = paste0("../Data/RData_longitudinal/longitudinalEPCs_",previous_region,".RData") )
+      
+      previous_region<- current_region
+      
+      mapping <- list()  
+      longitudinalEPCs_long <- list()
+    }
+    
+    
+    
+    
+    
     
     #convert to date.time
     certificates[, INSPECTION_DATE := fastPOSIXct(INSPECTION_DATE, required.components = 3L)] #3 means only the date is required to a conversion to be valid
@@ -136,37 +158,18 @@ for (LA in folders_sorted_by_regional_LUT) {
     #Create the Crossectional Dataset (include only most recent obvervations of repeat entries)
     #------------------------------------------------------------------------------------------------------------------------------
     ###Problem 2: Identifing all repeats, except the latest observations to create blacklist
-    
-    
     tmp_mapping_blacklist <- as.data.table(duplicated_certificates[which( !duplicated(duplicated_certificates$n_GRP) ),]$LMK_KEY )
     tmp_mapping <- certificates[!certificates$LMK_KEY %in% tmp_mapping_blacklist$V1,] #keep those outside the blacklist
-    
-    
-    ## Create a list of places by region:
-    ####NOTE: assumes the regions will be seen in order
-    if(LA == folders_sorted_by_regional_LUT[1]){
-      previous_region <- r_region
-      mapping <- list() 
-    }
-    
-    if(r_region == previous_region){
-      mapping <- rbindlist(list(mapping,tmp_mapping ))
-      
-    }else if(r_region != previous_region){
-      print(previous_region)
-      print(LA)
-      
-      save(mapping, file = paste0("../Data/RData_crossSectional/crossSectional_",previous_region,".RData") )
-      save(longitudinalEPCs_long, file = paste0("../Data/RData_longitudinal/longitudinalEPCs_",previous_region,".RData") )
-      mapping <- list()  
-      mapping <- rbindlist(list(mapping,tmp_mapping ))
-      previous_region<- regional_LUT[LA]$RGN11NM  
-      
-      
-      longitudinalEPCs_long <- list()
-    }
+    mapping <- rbindlist(list(mapping,tmp_mapping ))
    #------------------------------------------------------------------------------------------------------------------------------
 }
+
+save(mapping, file = paste0("../Data/RData_crossSectional/crossSectional_",current_region,".RData") )
+save(longitudinalEPCs_long, file = paste0("../Data/RData_longitudinal/longitudinalEPCs_",current_region,".RData") )
+      
+
+      
+      
 print(paste('loop time:', Sys.time() - start.time))#"loop time: 2.35320606278049"
 ```
 
