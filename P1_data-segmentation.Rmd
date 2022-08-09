@@ -53,6 +53,8 @@ folders_sorted_by_regional_LUT <- regional_LUT[order(RGN11NM)]$Folder
 start.time <- Sys.time()
 for (LA in folders_sorted_by_regional_LUT) {
   
+  print(LA)
+  
   print_counter = print_counter+1
   if(print_counter %% 20 == 0){print(LA)} 
   
@@ -142,7 +144,7 @@ for (LA in folders_sorted_by_regional_LUT) {
     
     ## Create a list of places by region:
     ####NOTE: assumes the regions will be seen in order
-    if(LA == folders[1]){
+    if(LA == folders_sorted_by_regional_LUT[1]){
       previous_region <- r_region
       mapping <- list() 
     }
@@ -164,9 +166,6 @@ for (LA in folders_sorted_by_regional_LUT) {
       longitudinalEPCs_long <- list()
     }
    #------------------------------------------------------------------------------------------------------------------------------
-    
-   #Create the Crossectional Meta-dataset
-
 }
 print(paste('loop time:', Sys.time() - start.time))#"loop time: 2.35320606278049"
 ```
