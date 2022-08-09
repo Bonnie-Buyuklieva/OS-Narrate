@@ -136,17 +136,6 @@ names(folders_meta_dups) <- c('folder', 'totalRows', 'NA_uprn','str_uniq', 'uprn
 
 
 
-```{r}
-load(file = 'C:/Users/billi/Dropbox/_PhD/Application Documents/CASA RA/RA OS NARRATE CASA/Data/WIP_UPRN.RData')
-
-load(file = 'C:/Users/billi/Dropbox/_PhD/Application Documents/CASA RA/RA OS NARRATE CASA/Data/WIP_udbc_UPRN.RData')
-
-load(file = 'C:/Users/billi/Dropbox/_PhD/Application Documents/CASA RA/RA OS NARRATE CASA/Data/MetaData&StringDups.RData')
-```
-
-
-
-
 
 
 # Feature Engineering Set-Up
@@ -156,7 +145,7 @@ start.time <- Sys.time()
 
 
 #loads str_dups [7 847 301]
-load(file = './MetaData&StringDups.RData')
+#load(file = './MetaData&StringDups.RData')
 
 #Df of all rows that repeat
 tmp <- str_dups[,subsetCols ]

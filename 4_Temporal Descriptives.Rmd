@@ -9,44 +9,125 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 library(dplyr)
 library(tidyverse)
+library(data.table)
+library(fasttime)
 ```
 
-```{r}
-load('./str_dups_deltas_c11.RData')
+```{r test set up}
+region <- "South West"
+load(paste0("../Data/RData_longitudinal/longitudinalEPCs_",region,".RData"))
+long <- longitudinalEPCs_long
+
+region <- "Unknown"
+load(paste0("../Data/RData_crossSectional/crossSectional_",region,".RData"))
+#does have n_UPRN to be counted
+cross <- mapping
+
+delta_cols <-  c("LMK_KEY","n_GRP","INSPECTION_DATE","RGN11NM","LAD11NM","UPRN","ubdc_UPRN","n_UPRN","CURRENT_ENERGY_EFFICIENCY", "CURRENT_ENERGY_RATING")
+tmp <- long[1:500]
 ```
 
 
-```{r}
+
+
+```{r metadataLong}
+region <- 'region'
+
+
 start.time <- Sys.time()
 
-tmp <- str_dups_deltas_c11 %>%
-  group_by(LOCAL_AUTHORITY, combined) %>% #similarity metric here 
+tmp <- 
+
+#first and last entries
+tmp <- tmp[order(n_GRP,INSPECTION_DATE)]
+tmp[, n_first :=  min(INSPECTION_DATE), by=list(n_GRP)]
+tmp[, n_last := max(INSPECTION_DATE), by=list(n_GRP)]
+
+#info on repeats
+tmp[, n_appearance := .N , by=list(n_GRP)]
+
+#info on UPRNs differences and NAs
+tmp[, n_erNoUPRN := ifelse(UPRN == ubdc_UPRN,'same','diffUPRNs')]
+tmp[, n_erNoUPRN := ifelse(UPRN == "" ,'diffUPRNs_NA_UPRN',n_erNoUPRN) ]
+tmp[, n_erNoUPRN := ifelse(ubdc_UPRN == "" ,'diffUPRNs_NA_ubdc_UPRN',n_erNoUPRN) ]
+tmp[, n_erNoUPRN := ifelse(n_UPRN == "" ,'noUPRN',n_erNoUPRN) ]
+
+
+#testercols <- c( "n_GRP", "CURRENT_ENERGY_RATING", names(tmp)[which(startsWith(names(tmp),'n_'))])
+
+
+#Deltas
+##Change in CEE from previous entry
+tmp[,CURRENT_ENERGY_EFFICIENCY := type.convert(CURRENT_ENERGY_EFFICIENCY) ]##magically convert to str to int:
+tmp[, n_d_cEE := CURRENT_ENERGY_EFFICIENCY - shift(CURRENT_ENERGY_EFFICIENCY , fill = first(CURRENT_ENERGY_EFFICIENCY)), by=list(n_GRP)]
+tmp[, n_d_cEE := ifelse(INSPECTION_DATE == n_first, NA_integer_, n_d_cEE), by=list(n_GRP)]
+
+
+##Days between previous entry
+tmp[, n_d_time := as.numeric(difftime(INSPECTION_DATE, 
+                                      shift(INSPECTION_DATE , fill = first(INSPECTION_DATE)),
+                                      units = c("days"))), by=list(n_GRP)]
+
+
+
+#Changes between the first and last, where more than 2 entries
+tmp[, n_delta_change_first2last := last(CURRENT_ENERGY_EFFICIENCY) - first(CURRENT_ENERGY_EFFICIENCY), by=list(n_GRP)]
+tmp[  n_last != INSPECTION_DATE, n_delta_change_first2last:= NA]
+
+
+
+tmp[, n_changeDir_first2last := ifelse(n_delta_change_first2last > 0, 'up', ifelse(n_delta_change_first2last == 0, 'NA', 'down' ) ) ]
+
+tmp[, n_changeLetter_first2last := ifelse(last(CURRENT_ENERGY_RATING) == first(CURRENT_ENERGY_RATING),'same','diff'), by=list(n_GRP)]
+tmp[  n_last != INSPECTION_DATE, n_changeLetter_first2last:= NA]
+
+print(paste('runtime:', Sys.time() - start.time))#2 mins
+
+
+#LAD tally:
+LAD_tally <-  c("LAD11NM","LMK_KEY","n_GRP","CURRENT_ENERGY_RATING","n_appearance","n_erNoUPRN","n_delta_change_first2last","n_changeDir_first2last","n_changeDir_first2last","n_changeLetter_first2last")
+LAD_tally <-  tmp[,..LAD_tally]
+save(LAD_tally, file = paste0("../Outputs/WIP_longitudinal/LAD_tally_",region,".RData") )
+
+
+#skinny long, by region:
+skinny_long <- c("RGN11NM","LAD11NM","LMK_KEY","n_GRP","n_appearance","CURRENT_ENERGY_EFFICIENCY","INSPECTION_DATE","n_d_cEE","n_d_time")
+skinny_long <-  tmp[INSPECTION_DATE != n_first,..skinny_long]#remove all firsttime entries
+save(skinny_long, file = paste0("../Outputs/WIP_longitudinal/skinny_long",region,".RData") )
+
+rm(tmp,LAD_tally,skinny_long)
+
+```
+
+
+```{P2-deltas r}
+```
+
+
+
+
+
+
+
+
+```{appearance matrix r}
+start.time <- Sys.time()
+
+#create appearance_matrix
+tmp <- long %>%
+  group_by(LAD11NM, n_GRP) %>% 
   summarise(appears = n())
-
-
 appearance_matrix <- tmp %>%
   group_by(appears) %>%
-  summarise(count = n())
+  summarise(count = n(),
+            region = region)
 
 print(paste('runtime:', Sys.time() - start.time))
 
 
-write.csv( subset(tmp, tmp$appears>9), file = '../Outputs/WIP_appearance_matrix_over_9.csv')
+View(unique(long$TRANSACTION_TYPE))
 ```
 
 
 
-
-```{r Added220801}
-start.time <- Sys.time()
-sorted_udbc_UPRN <- udbc_UPRN[order(udbc_UPRN$udbc_UPRN, udbc_UPRN$INSPECTION_DATE),]
-print(paste('sorted_udbc_UPRN runtime:', Sys.time() - start.time))#3.7183694322904
-
-
-start.time <- Sys.time()
-sorted_UPRN <- UPRN[order(UPRN$UPRN, UPRN$INSPECTION_DATE),]
-print(paste('UPRN runtime:', Sys.time() - start.time))# 5.56712331771851
-
-
-```
 

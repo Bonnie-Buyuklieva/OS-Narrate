@@ -27,7 +27,45 @@ folders <- list.files(path = "../Data/all-domestic-certificates", pattern = NULL
 folders <- folders[-342] #remove the .txt
 ```
 
+```{metadataCross r}
+#setup Metadata Folders 
+#Get difference by LAD, eg.g: 
+folders_meta <- data.frame(names = folders)
+folders_meta$folder <- folders
+folders_meta$region <- ''
 
+folders_meta$totalEntries <- 0
+folders_meta$totalwithoutUPRN <- 0
+folders_meta$totalwithoutLodgementDate <- 0
+
+
+
+## Min, Max, Mean, SD of INSPECTION DATE and/or Lodgementdate
+folders_meta$IdateMin <- 0
+folders_meta$IdateMax <- 0
+folders_meta$IdateMedian <- 0 #Problem NAs
+  
+folders_meta$LdateMin <- 0
+folders_meta$LdateMax <- 0
+folders_meta$LdateMedian <- 0 #Problem NAs
+
+
+## CURRENT_ENERGY_RATING (factor)
+folders_meta$cERmedian <- 0
+folders_meta$PerCentcER_underC <- 0
+
+
+## POTENTIAL - CURRENT_ENERGY_EFFICIENCY (int)
+folders_meta$p_cEEficMedian <- 0 #Problem NAs
+folders_meta$p_cEEficMean <- 0
+folders_meta$p_cEEficSD <- 0
+
+
+
+
+##from the longitudinal
+folders_meta$PerCentOneOffEntries <- 0 ## % one-off entries by folder.
+```
 
 ```{r loop}
 C_relative <- data.frame(matrix(ncol = 4, nrow = 0))
