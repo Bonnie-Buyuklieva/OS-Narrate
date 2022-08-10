@@ -29,7 +29,37 @@ cross_data <- gsub("crossSectional_","",as.character(cross_data))
 
 
 #get loopUp
-LUT <- read_excel("../Data/OS-N_EPC_v10_LUT+dictionaries.xlsx", sheet = "TENURE",range = cell_cols("B:C"))
+LUT_tenure <- read_excel("../Data/OS-N_EPC_v10_LUT+dictionaries.xlsx", sheet = "TENURE",range = cell_cols("B:C"))
+
+LAD_row_tally_after_replace_by_LUT <- function( tmp = tmp, EPC_col_topic = 'TENURE', harm_LUT = LUT_tenure, reg = region, LAD = LA){
+
+  
+  colID <- which(names(tmp) == EPC_col_topic)
+  
+  ##LUT_colum <- LUT[match(tmp$TENURE, LUT$tenure_factors),"harmonisation"]
+  #LUT 1 is all possible factors 
+  LUT_colum <- harm_LUT[match(tmp[,c(EPC_col_topic)], harm_LUT[,1]),"harmonisation"]
+  
+  tmp[,n_newCol := LUT_colum]
+  tmp[is.na(n_newCol),n_newCol := 'unknown'] #deals with NAs
+  
+  #View(tmp[,c('TENURE','n_tenure')])  
+  t_LAD_row <- tmp[,.N ,by = c('n_newCol')]
+  ##LUT_colum <- LUT[tmp[,TENURE], 'harmonisation']
+  
+  
+  #Create the actual row 
+  #merge to complete set of possible subgroups 
+  #to account for cases where some factor may be missing
+  all_possible <- data.table(unique(LUT$harmonisation))
+  merged <-merge(t_LAD_row,all_possible,by.x= 'n_newCol', by.y = 'V1', all = T )
+  merged[is.na(merged)] <- 0
+  rm(all_possible)
+  
+  t_LAD_row <- c(reg, LAD, merged$N)
+  
+  return(t_LAD_row)
+}
 ```
 
 
@@ -66,50 +96,21 @@ for (region in cross_data) {
 
 
 ```{r LUT_loop }
-  LUT <- data.table(LUT)
-
-for (region in cross_data) {
+  LUT_tenure <- data.table(LUT_tenure)
+  LAD_table <- data.table()
   
-  print(paste(region, Sys.time()))
-  
-  tmp <- loadRData(paste0("../Data/RData_crossSectional/crossSectional_",region,".RData") )
-
-  #N1: Tenure
-  EPC_col_topic <- 'TENURE'
-  LUT_col_factors <- 'tenure_factors'
-loadRData <- function(){
-  
-  EPC_col_topic <- 'TENURE'
-  LUT_col_factors <- 'tenure_factors' 
-  
-  ##LUT_colum <- LUT[match(tmp$TENURE, LUT$tenure_factors),"harmonisation"]
-  LUT_colum <- LUT[match(tmp[,EPC_col_topic], LUT[,LUT_col_factors]),"harmonisation"]
-  
-  tmp[,n_newCol := LUT_colum]
-  tmp[is.na(n_newCol),n_newCol := 'unknown'] #deals with NAs
-  
-  #View(tmp[,c('TENURE','n_tenure')])  
-  t_LAD_row <- tmp[,.N ,by = c('n_newCol')]
-  ##LUT_colum <- LUT[tmp[,TENURE], 'harmonisation']
-  
+  for (region in cross_data) {
     
-  #Create the actual row 
-  #merge to complete set of possible subgroups 
-  #to account for cases where some factor may be missing
-  all_possible <- data.table(unique(LUT$harmonisation))
-  merged <-merge(t_LAD_row,all_possible,by.x= 'n_newCol', by.y = 'V1', all = T )
-  merged[is.na(merged)] <- 0
-  rm(all_possible )
-  
-  t_LAD_row <- c('LOCALAUTHORITYHERE', merged$N)
-  LAD_table <- rbind(merged$N,merged$N)  
-  
-  return(LAD_table)
-}
-  
-
-
-}
+    print(paste(region, Sys.time()))
+    tmp <- loadRData(paste0("../Data/RData_crossSectional/crossSectional_",region,".RData") )
+    
+    for (LA in unique(tmp$LAD11NM)) {
+      
+      row <- LAD_row_tally_after_replace_by_LUT( EPC_col_topic = 'TENURE', harm_LUT = LUT_tenure, reg = region, LAD = LA)
+      LAD_table <- rbind(LAD_table, t(row))
+    }
+    
+  }
 ```
 
 
