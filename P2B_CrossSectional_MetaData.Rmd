@@ -33,12 +33,10 @@ LUT_tenure <- read_excel("../Data/OS-N_EPC_v10_LUT+dictionaries.xlsx", sheet = "
 
 LAD_row_tally_after_replace_by_LUT <- function( tmp = tmp, EPC_col_topic = 'TENURE', harm_LUT = LUT_tenure, reg = region, LAD = LA){
 
-  
-  colID <- which(names(tmp) == EPC_col_topic)
-  
   ##LUT_colum <- LUT[match(tmp$TENURE, LUT$tenure_factors),"harmonisation"]
-  #LUT 1 is all possible factors 
-  LUT_colum <- harm_LUT[match(tmp[,c(EPC_col_topic)], harm_LUT[,1]),"harmonisation"]
+  #LUT col 1 is all possible factors 
+  colID <- which(names(tmp) == EPC_col_topic)
+  LUT_colum <- harm_LUT[match(tmp[,colID], harm_LUT[,1]),"harmonisation"]
   
   tmp[,n_newCol := LUT_colum]
   tmp[is.na(n_newCol),n_newCol := 'unknown'] #deals with NAs
@@ -54,7 +52,7 @@ LAD_row_tally_after_replace_by_LUT <- function( tmp = tmp, EPC_col_topic = 'TENU
   all_possible <- data.table(unique(LUT$harmonisation))
   merged <-merge(t_LAD_row,all_possible,by.x= 'n_newCol', by.y = 'V1', all = T )
   merged[is.na(merged)] <- 0
-  rm(all_possible)
+  rm(all_possible, colID)
   
   t_LAD_row <- c(reg, LAD, merged$N)
   
