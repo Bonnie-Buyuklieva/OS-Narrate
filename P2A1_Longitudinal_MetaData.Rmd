@@ -5,6 +5,8 @@ date: "May 24, 2022"
 output: html_document
 ---
 
+Note: previously named 4_temporal descriptives
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(dplyr)
@@ -17,10 +19,20 @@ loadRData <- function(fileName){
     load(fileName)
     get(ls()[ls() != "fileName"])
 }
+
+#get folders
+long_data <- list.files(path = "../Data/RData_longitudinal", pattern = NULL, all.files = FALSE,
+           full.names = FALSE, recursive = FALSE,
+           ignore.case = FALSE, include.dirs = FALSE, no.. = FALSE)
+#move London to the back
+long_data <- long_data[c(1,2,c(seq(4,11,by=1)),3)]
+long_data <- gsub(".RData","",as.character(long_data))
+long_data <- gsub("longitudinalEPCs_","",as.character(long_data))
 ```
 
 ```{r test set up}
-region <- "South West"
+if(F){
+ region <- "South West"
 load(paste0("../Data/RData_longitudinal/longitudinalEPCs_",region,".RData"))
 long <- longitudinalEPCs_long
 
@@ -31,29 +43,19 @@ cross <- mapping
 
 delta_cols <-  c("LMK_KEY","n_GRP","INSPECTION_DATE","RGN11NM","LAD11NM","UPRN","ubdc_UPRN","n_UPRN","CURRENT_ENERGY_EFFICIENCY", "CURRENT_ENERGY_RATING")
 tmp <- long[1:500]
-region <- 'region'
+region <- 'region' 
+}
+
 ```
 
 
-
-
 ```{r metadataLong}
-#get folders
-long_data <- list.files(path = "../Data/RData_longitudinal", pattern = NULL, all.files = FALSE,
-           full.names = FALSE, recursive = FALSE,
-           ignore.case = FALSE, include.dirs = FALSE, no.. = FALSE)
-
-
-
 start.time <- Sys.time()
-
-
 #long_data <- long_data[1] #testing
 for (region in long_data) {
   print(paste(region, Sys.time()))
   
-  
-  tmp <- loadRData(paste0("../Data/RData_longitudinal/",region) )
+  tmp <- loadRData(paste0("../Data/RData_longitudinal/longitudinalEPCs_",region,".RData") )
   
   
   #first and last entries
@@ -68,9 +70,9 @@ for (region in long_data) {
   
   #info on UPRNs differences and NAs
   tmp[, n_erNoUPRN := ifelse(UPRN == ubdc_UPRN,'same','diffUPRNs')]
-  tmp[, n_erNoUPRN := ifelse(UPRN == "" ,'diffUPRNs_NA_UPRN',n_erNoUPRN) ]
-  tmp[, n_erNoUPRN := ifelse(ubdc_UPRN == "" ,'diffUPRNs_NA_ubdc_UPRN',n_erNoUPRN) ]
-  tmp[, n_erNoUPRN := ifelse(n_UPRN == "" ,'noUPRN',n_erNoUPRN) ]
+  tmp[, n_erNoUPRN := ifelse(UPRN == "" || is.na(UPRN),'diffUPRNs_NA_UPRN',n_erNoUPRN) ]
+  tmp[, n_erNoUPRN := ifelse(ubdc_UPRN == ""|| is.na(ubdc_UPRN),'diffUPRNs_NA_ubdc_UPRN',n_erNoUPRN) ]
+  tmp[, n_erNoUPRN := ifelse(n_UPRN == "" || is.na(n_UPRN),'noUPRN',n_erNoUPRN) ]
   
   
   #testercols <- c( "n_GRP", "CURRENT_ENERGY_RATING", names(tmp)[which(startsWith(names(tmp),'n_'))])
@@ -78,15 +80,18 @@ for (region in long_data) {
   
   #Deltas
   ##Change in CEE from previous entry
-  tmp[,CURRENT_ENERGY_EFFICIENCY := as.integer(CURRENT_ENERGY_EFFICIENCY) ]##magically convert to str to int:
+  tmp[,CURRENT_ENERGY_EFFICIENCY := as.integer(CURRENT_ENERGY_EFFICIENCY) ]
   tmp[, n_d_cEE := CURRENT_ENERGY_EFFICIENCY - shift(CURRENT_ENERGY_EFFICIENCY , fill = first(CURRENT_ENERGY_EFFICIENCY)), by=list(n_GRP)]
-  tmp[, n_d_cEE := ifelse(INSPECTION_DATE == n_first, NA, n_d_cEE), by=list(n_GRP)]
+  tmp[INSPECTION_DATE == n_first, n_d_cEE := NA_integer_]
   
   
   ##Days between previous entry
   tmp[, n_d_time := as.numeric(difftime(INSPECTION_DATE, 
                                         shift(INSPECTION_DATE , fill = first(INSPECTION_DATE)),
                                         units = c("days"))), by=list(n_GRP)]
+  
+  tmp[, n_d_time_same_insp_day := ifelse(n_d_time == 0, 'same_day', ifelse(n_d_time < 8, 'same_week', ifelse(n_d_time < 30, 'same_month', ifelse(n_d_time < 365, 'same_year', 'more_than_yr' ) )))]
+
   
   
   
@@ -104,34 +109,88 @@ for (region in long_data) {
   print(paste('runtime:', Sys.time() - start.time))#2 mins
   
   #LAD tally:
-  LAD_tally <-  c("LAD11NM","LMK_KEY","n_GRP","CURRENT_ENERGY_RATING","n_appearance","n_erNoUPRN","n_delta_change_first2last","n_changeDir_first2last","n_changeDir_first2last","n_changeLetter_first2last")
+  LAD_tally <-  c("LAD11NM","LMK_KEY","n_GRP","CURRENT_ENERGY_RATING","n_appearance","n_erNoUPRN","n_delta_change_first2last","n_changeDir_first2last","n_changeDir_first2last","n_changeLetter_first2last","n_d_time_same_insp_day")
   LAD_tally <-  tmp[,..LAD_tally]
-  save(LAD_tally, file = paste0("../Outputs/WIP_longitudinal/LAD_tally_",region,".RData") )
+  save(LAD_tally, file = paste0("../Outputs/WIP_longitudinal/long_LAD_tally_",region,".RData") )
   
   
   #skinny long, by region:
   skinny_long <- c("RGN11NM","LAD11NM","LMK_KEY","n_GRP","n_appearance","CURRENT_ENERGY_EFFICIENCY","INSPECTION_DATE","n_d_cEE","n_d_time")
   skinny_long <-  tmp[INSPECTION_DATE != n_first,..skinny_long]#remove all firsttime entries
-  save(skinny_long, file = paste0("../Outputs/WIP_longitudinal/skinny_long",region,".RData") )
+  
+  
+  save(skinny_long, file = paste0("../Outputs/WIP_longitudinal/long_skinny_long_",region,".RData") )
+  print(paste('save time:', Sys.time() - start.time))#2 mins
   
   rm(tmp,LAD_tally,skinny_long)
-  )
 }
 
 
 ```
 
 
-```{P2-deltas r}
 
-[1] "longitudinalEPCs_East Midlands.RData 2022-08-10 00:17:49"
-[1] "runtime: 2.7486931681633"
-[1] "longitudinalEPCs_East of England.RData 2022-08-10 00:20:47"
-[1] "runtime: 6.42253536780675"
-[1] "longitudinalEPCs_London.RData 2022-08-10 00:24:26"
+```{r}
+#next step:
+## summary <- tmp[,.N, by = c('n_d_time_same_insp_day', 'LAD11NM' )]
+## summary_by_LAD <- reshape(summary, idvar = "LAD11NM", timevar = "N", direction = "wide")
+```
 
+
+```{r}
+region = 'longitudinalEPCs_North East' #small region
+LAD_tally_tmp <- loadRData(paste0("../Outputs/WIP_longitudinal/LAD_tally_",region,".RData") )
+skinny_long_tmp <- loadRData(paste0("../Outputs/WIP_longitudinal/skinny_long",region,".RData") )
+
+names(tmp)[which(startsWith(names(tmp),'n_'))]
 
 ```
+
+
+[1] "East Midlands 2022-08-10 08:31:35"
+[1] "runtime: 2.9134230017662"
+[1] "save time: 3.16486191749573"
+
+[1] "East of England 2022-08-10 08:34:45"
+[1] "runtime: 6.46780414978663"
+[1] "save time: 6.67242088317871"
+
+[1] "North East 2022-08-10 08:38:15"
+[1] "runtime: 8.32375133434931"
+[1] "save time: 8.43181811571121"
+
+[1] "North West 2022-08-10 08:40:01"
+[1] "runtime: 12.5715287685394"
+[1] "save time: 12.8831171154976"
+
+[1] "South East 2022-08-10 08:44:28"
+[1] "runtime: 17.3082739671071"
+[1] "save time: 17.602920114994"
+
+[1] "South West 2022-08-10 08:49:11"
+[1] "runtime: 20.1300816853841"
+[1] "save time: 20.3295335332553"
+
+[1] "Unknown 2022-08-10 08:51:55"
+[1] "runtime: 20.3344329833984"
+[1] "save time: 20.3348163326581"
+
+[1] "Wales 2022-08-10 08:51:55"
+[1] "runtime: 22.4443284153938"
+[1] "save time: 22.6198897838593"
+
+[1] "West Midlands 2022-08-10 08:54:12"
+[1] "runtime: 26.8543520649274"
+[1] "save time: 27.1509215831757"
+
+[1] "Yorkshire and The Humber 2022-08-10 08:58:44"
+[1] "runtime: 33.01410886844"
+[1] "save time: 33.1741558988889"
+
+[1] "London 2022-08-10 09:04:45"
+[1] "runtime: 38.6243985335032"
+[1] "save time: 38.979339782397"
+
 
 
 

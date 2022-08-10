@@ -1,0 +1,159 @@
+---
+title: "Tenure - EPCs in V10"
+author: "Boyana Buyuklieva"
+date: "May 4, 2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(tidyverse)
+library(data.table)
+library(fasttime)
+library(readxl)
+
+loadRData <- function(fileName){
+    #loads an RData file, and returns it
+    load(fileName)
+    get(ls()[ls() != "fileName"])
+}
+
+#get folders
+cross_data <- list.files(path = "../Data/RData_crossSectional", pattern = NULL, all.files = FALSE,
+           full.names = FALSE, recursive = FALSE,
+           ignore.case = FALSE, include.dirs = FALSE, no.. = FALSE)
+
+cross_data <- gsub(".RData","",as.character(cross_data))
+cross_data <- gsub("crossSectional_","",as.character(cross_data))
+
+
+#get loopUp
+LUT <- read_excel("../Data/OS-N_EPC_v10_LUT+dictionaries.xlsx", sheet = "TENURE",range = cell_cols("B:C"))
+```
+
+
+
+```{r baseline_loop}
+for (region in cross_data) {
+  #region = cross_data[4] #testing
+  print(paste(region, Sys.time()))
+  
+  tmp <- loadRData(paste0("../Data/RData_crossSectional/crossSectional_",region,".RData") )
+  
+  c("UPRN","ubdc_UPRN","n_UPRN","TENURE","CURRENT_ENERGY_RATING")
+  
+  
+  #N1: info on UPRNs differences and NAs
+  tmp[, n_erNoUPRN := ifelse(UPRN == ubdc_UPRN,'same','diffUPRNs')]
+  tmp[, n_erNoUPRN := ifelse(UPRN == "" || is.na(UPRN),'diffUPRNs_NA_UPRN',n_erNoUPRN) ]
+  tmp[, n_erNoUPRN := ifelse(ubdc_UPRN == ""|| is.na(ubdc_UPRN),'diffUPRNs_NA_ubdc_UPRN',n_erNoUPRN) ]
+  tmp[, n_erNoUPRN := ifelse(n_UPRN == "" || is.na(n_UPRN),'noUPRN',n_erNoUPRN) ]
+  
+  #N2: count number of instances 
+  tmp[, n_N := .N,  by = list(LAD11NM)]
+  
+  #N3: create C relative column
+  tmp[, n_Crel:= ifelse(CURRENT_ENERGY_RATING == 'C', 'C', 
+                                ifelse(CURRENT_ENERGY_RATING %in% c('A', 'B'), 'C+', 
+                                       ifelse(CURRENT_ENERGY_RATING %in% c('D', 'E','F','G'),'C-','NA' )))]
+  
+  tmp <- tmp[, c("LAD11NM","LMK_KEY","n_erNoUPRN","n_N","n_Crel")]
+  save(tmp, file = paste0("../Outputs/WIP_longitudinal/crossSectional_baseline_",region,".RData") )
+
+}
+```
+
+
+```{r LUT_loop }
+  LUT <- data.table(LUT)
+
+for (region in cross_data) {
+  
+  print(paste(region, Sys.time()))
+  
+  tmp <- loadRData(paste0("../Data/RData_crossSectional/crossSectional_",region,".RData") )
+
+  #N1: Tenure
+  EPC_col_topic <- 'TENURE'
+  LUT_col_factors <- 'tenure_factors'
+loadRData <- function(){
+  
+  EPC_col_topic <- 'TENURE'
+  LUT_col_factors <- 'tenure_factors' 
+  
+  ##LUT_colum <- LUT[match(tmp$TENURE, LUT$tenure_factors),"harmonisation"]
+  LUT_colum <- LUT[match(tmp[,EPC_col_topic], LUT[,LUT_col_factors]),"harmonisation"]
+  
+  tmp[,n_newCol := LUT_colum]
+  tmp[is.na(n_newCol),n_newCol := 'unknown'] #deals with NAs
+  
+  #View(tmp[,c('TENURE','n_tenure')])  
+  t_LAD_row <- tmp[,.N ,by = c('n_newCol')]
+  ##LUT_colum <- LUT[tmp[,TENURE], 'harmonisation']
+  
+    
+  #Create the actual row 
+  #merge to complete set of possible subgroups 
+  #to account for cases where some factor may be missing
+  all_possible <- data.table(unique(LUT$harmonisation))
+  merged <-merge(t_LAD_row,all_possible,by.x= 'n_newCol', by.y = 'V1', all = T )
+  merged[is.na(merged)] <- 0
+  rm(all_possible )
+  
+  t_LAD_row <- c('LOCALAUTHORITYHERE', merged$N)
+  LAD_table <- rbind(merged$N,merged$N)  
+  
+  return(LAD_table)
+}
+  
+
+
+}
+```
+
+
+
+
+```{r LUT_test}
+LAD_table <- list()
+
+  
+  if(F){
+      ##LUT dups
+  ###CODE TESTING HERE
+  t_tmp <- tmp[1:500,]
+  
+  t_tmp$TENURE[10] <- NA
+  LUT_colum <- LUT[match(t_tmp$TENURE, LUT$tenure_factors),"harmonisation"]
+  t_tmp[,n_tenure := LUT_colum]
+  t_tmp[is.na(n_tenure),n_tenure := 'unknown'] #deals with NAs
+  
+  #View(t_tmp[,c('TENURE','n_tenure')])  
+  t_LAD_row <- t_tmp[,.N ,by = c('n_tenure')]
+  LUT_colum <- LUT[t_tmp$TENURE, 'harmonisation']
+    
+  all_possible <- data.table(unique(LUT$harmonisation))
+  
+  
+  #merge to complete set to account for cases where some factor may be missing
+  merged <-merge(t_LAD_row,all_possible,by.x= 'n_tenure', by.y = 'V1', all = T )
+  merged[is.na(merged)] <- 0
+  
+  t_LAD_row <- c(LOCALAUTHORITYHERE, merged$N)
+    
+  LAD_table <- rbind(merged$N,merged$N)  
+  }
+
+```
+
+```{r loop template }
+for (region in cross_data) {
+  
+  print(paste(region, Sys.time()))
+  #region = cross_data[4] #testing
+  
+  tmp <- loadRData(paste0("../Data/RData_crossSectional/crossSectional_",region,".RData") )
+
+}
+```

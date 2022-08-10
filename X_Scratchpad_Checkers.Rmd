@@ -110,11 +110,3 @@ print(paste('loop time:', Sys.time() - start.time))#"loop time: 2.35320606278049
 
 
 
-
-
-```{r}
-
-
-
-}
-```

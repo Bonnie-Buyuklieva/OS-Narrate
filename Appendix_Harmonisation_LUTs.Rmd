@@ -8,7 +8,7 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library("data.table")
-library("xlsx")
+library("readxl")
 
 loadRData <- function(fileName){
     #loads an RData file, and returns it
@@ -96,14 +96,11 @@ for (LA in folders) {
 
 if(F){
    write.xlsx(rowCount,
-             file = "../Data/OS-N_EPC_v10_LUT+dictionaries.xlsx", sheetName="RawRowTotals", append=TRUE)
+             file = "../Data/OS-N_EPC_v10_Overviews.xlsx", sheetName="RawRowTotals", append=TRUE)
 }
 ```
 
-
 #Counting on RData Directory
-
-
 ```{r long}
 #get folders
 long_data <- list.files(path = "../Data/RData_longitudinal", pattern = NULL, all.files = FALSE,
@@ -134,7 +131,9 @@ for (region in long_data) {
     
     
     n_row <- lengths(tmp_dt_subset)[1]
+    
     unique_GRPs <- length(unique(tmp_dt_subset$n_GRP))
+    
     unique_n_UPRN <- length(unique(tmp_dt_subset$n_UPRN))
     na_n_UPRN <- sum(is.na(tmp_dt_subset$n_UPRN))
     na_UPRN <- sum(is.na(tmp_dt_subset$UPRN))
@@ -149,7 +148,11 @@ for (region in long_data) {
     #add transaction tally 
     transactionDt <- tmp_dt_subset[, .N, by=.(TRANSACTION_TYPE)]
     #compains here. ? use.names=FALSE
-    trans <- transactionDt$N[match(LUT_transaction$TRANSACTION_TYPEfactors,transactionDt$TRANSACTION_TYPE, use.names=FALSE)]
+    #Test: East Midlands: North-East-Derbyshire, Harborough, 
+    #Oadby-and-Wigston - unknown & Stock Condition Survey gives NAs
+    
+
+    trans <- transactionDt$N[match(LUT_transaction$TRANSACTION_TYPEfactors,transactionDt$TRANSACTION_TYPE)]
     
     
     row <- c(region, LA, n_row, unique_GRPs, unique_n_UPRN, na_n_UPRN,na_UPRN,repeat_more_than2x, trans)
@@ -161,9 +164,10 @@ for (region in long_data) {
 }
 
 write.xlsx(metadata_long,
-             file = "../Data/OS-N_EPC_v10_LUT+dictionaries.xlsx", sheetName="meta_data_long", append=TRUE)
+             file = "../Data/OS-N_EPC_v10_Overviews.xlsx", sheetName="meta_data_long", append=TRUE)
 
-print(paste('runtime:', Sys.time() - start.time))#
+print(paste('runtime:', Sys.time() - start.time))
+#5 mins, date: 10/08/22
 ```
 
 
