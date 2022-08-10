@@ -31,12 +31,13 @@ cross_data <- gsub("crossSectional_","",as.character(cross_data))
 #get loopUp
 LUT_tenure <- read_excel("../Data/OS-N_EPC_v10_LUT+dictionaries.xlsx", sheet = "TENURE",range = cell_cols("B:C"))
 
-LAD_row_tally_after_replace_by_LUT <- function( tmp = tmp, EPC_col_topic = 'TENURE', harm_LUT = LUT_tenure, reg = region, LAD = LA){
 
-  ##LUT_colum <- LUT[match(tmp$TENURE, LUT$tenure_factors),"harmonisation"]
-  #LUT col 1 is all possible factors 
-  colID <- which(names(tmp) == EPC_col_topic)
-  LUT_colum <- harm_LUT[match(tmp[,colID], harm_LUT[,1]),"harmonisation"]
+#slow?!
+LAD_row_tally_after_replace_by_LUT <- function(tmp = tmp, tmp_col_topic ='TENURE', harm_LUT = LUT_tenure, reg = region, LAD = LA){
+
+  harm_LUT <- data.table(harm_LUT)
+  LUT_colum <- harm_LUT[match( c(unlist( tmp[,..tmp_col_topic])), c(unlist(harm_LUT[,1])) ),"harmonisation"]
+  #LUT_colum <- LUT_tenure[match(tmp$TENURE, LUT_tenure$tenure_factors),"harmonisation"]
   
   tmp[,n_newCol := LUT_colum]
   tmp[is.na(n_newCol),n_newCol := 'unknown'] #deals with NAs
@@ -49,12 +50,15 @@ LAD_row_tally_after_replace_by_LUT <- function( tmp = tmp, EPC_col_topic = 'TENU
   #Create the actual row 
   #merge to complete set of possible subgroups 
   #to account for cases where some factor may be missing
-  all_possible <- data.table(unique(LUT$harmonisation))
+  all_possible <- data.table(unique(harm_LUT$harmonisation))
   merged <-merge(t_LAD_row,all_possible,by.x= 'n_newCol', by.y = 'V1', all = T )
   merged[is.na(merged)] <- 0
-  rm(all_possible, colID)
+  rm(all_possible)
   
   t_LAD_row <- c(reg, LAD, merged$N)
+
+  t_LAD_row <- data.frame(row = cbind(t_LAD_row, rownames = c('region', 'LAD', c(merged$n_newCol)) ), stringsAsFactors = F)
+
   
   return(t_LAD_row)
 }
@@ -92,10 +96,9 @@ for (region in cross_data) {
 }
 ```
 
-
-```{r LUT_loop }
-  LUT_tenure <- data.table(LUT_tenure)
-  LAD_table <- data.table()
+```{r LUT_loop_tenure-clean here  }
+LAD_table <- data.table()
+start.time <- Sys.time()
   
   for (region in cross_data) {
     
@@ -103,12 +106,63 @@ for (region in cross_data) {
     tmp <- loadRData(paste0("../Data/RData_crossSectional/crossSectional_",region,".RData") )
     
     for (LA in unique(tmp$LAD11NM)) {
+      LAD_row <- LAD_row_tally_after_replace_by_LUT(tmp = tmp, tmp_col_topic ='TENURE', harm_LUT = LUT_tenure, reg = region, LAD = LA)
       
-      row <- LAD_row_tally_after_replace_by_LUT( EPC_col_topic = 'TENURE', harm_LUT = LUT_tenure, reg = region, LAD = LA)
-      LAD_table <- rbind(LAD_table, t(row))
+      LAD_table <- rbind(LAD_table, t(LAD_row$row.t_LAD_row) , use.names=F, fill=FALSE)
+      #see discussion here: https://stackoverflow.com/questions/21605401/why-does-rbindlist-not-respect-column-names
+      names(LAD_table) <- LAD_row$row.rownames
+      
     }
-    
   }
+
+
+write.xlsx(LAD_table,
+             file = "../Data/CrossSectional_Summary.xlsx", sheetName="test_Tenure", append=TRUE)
+print(paste('loop time:', Sys.time() - start.time))#14 mins
+```
+
+
+```{r LUT_loop_tenure-clean here  }
+LAD_table <- data.table()
+start.time <- Sys.time()
+  
+  for (region in cross_data) {
+    
+    print(paste(region, Sys.time()))
+    tmp <- loadRData(paste0("../Data/RData_crossSectional/crossSectional_",region,".RData") )
+    
+    for (LA in unique(tmp$LAD11NM)) {
+     
+      if(F){
+      LUT_colum <- LUT_tenure[match(tmp$TENURE, LUT_tenure$tenure_factors),"harmonisation"]
+      tmp[,n_tenure := LUT_colum]
+      tmp[is.na(n_tenure),n_tenure := 'unknown'] #deals with NAs
+      
+      #View(tmp[,c('TENURE','n_tenure')])  
+      t_LAD_row <- tmp[,.N ,by = c('n_tenure')]
+      ##LUT_colum <- LUT[tmp[,TENURE], 'harmonisation']
+      
+      
+      #Create the actual row 
+      #merge to complete set of possible subgroups 
+      #to account for cases where some factor may be missing
+      all_possible <- data.table(unique(LUT_tenure$harmonisation))
+      merged <-merge(t_LAD_row,all_possible,by.x= 'n_tenure', by.y = 'V1', all = T )
+      merged[is.na(merged)] <- 0
+      rm(all_possible)
+      
+      t_LAD_row <- c(region, LA, merged$N)
+      LAD_table <- rbind(LAD_table, t_LAD_row)
+      }
+      
+
+    }
+  }
+
+
+write.xlsx(LAD_table,
+             file = "../Data/CrossSectional_Summary.xlsx", sheetName="Tenure", append=TRUE)
+print(paste('loop time:', Sys.time() - start.time))#14 mins
 ```
 
 
@@ -143,6 +197,11 @@ LAD_table <- list()
     
   LAD_table <- rbind(merged$N,merged$N)  
   }
+
+
+[1] "East Midlands 2022-08-10 21:14:53"
+[1] "East of England 2022-08-10 21:15:57"
+[1] "London 2022-08-10 21:18:03"
 
 ```
 
