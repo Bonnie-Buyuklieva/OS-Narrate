@@ -96,7 +96,7 @@ for (region in cross_data) {
 }
 ```
 
-```{r LUT_loop_tenure-clean here  }
+```{r LUT_loop}
 LAD_table <- data.table()
 start.time <- Sys.time()
   
@@ -106,7 +106,9 @@ start.time <- Sys.time()
     tmp <- loadRData(paste0("../Data/RData_crossSectional/crossSectional_",region,".RData") )
     
     for (LA in unique(tmp$LAD11NM)) {
-      LAD_row <- LAD_row_tally_after_replace_by_LUT(tmp = tmp, tmp_col_topic ='TENURE', harm_LUT = LUT_tenure, reg = region, LAD = LA)
+      tmp_LA <- tmp[ LAD11NM == LA, ]
+      
+      LAD_row <- LAD_row_tally_after_replace_by_LUT(tmp = tmp_LA, tmp_col_topic ='TENURE', harm_LUT = LUT_tenure, reg = region, LAD = LA)
       
       LAD_table <- rbind(LAD_table, t(LAD_row$row.t_LAD_row) , use.names=F, fill=FALSE)
       #see discussion here: https://stackoverflow.com/questions/21605401/why-does-rbindlist-not-respect-column-names
