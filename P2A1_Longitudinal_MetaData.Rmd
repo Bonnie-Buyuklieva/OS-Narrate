@@ -34,8 +34,7 @@ LUT_tenure <- read_excel("../Data/OS-N_EPC_v10_LUT+dictionaries.xlsx", sheet = "
 LUT_builtForm <- read_excel("../Data/OS-N_EPC_v10_LUT+dictionaries.xlsx", sheet = "BUILT_FORM",range = cell_cols("B:C"))
 ```
 
-
-```{r metadataLong new}
+```{r WIP_longitudinal}
 start.time <- Sys.time()
 #long_data <- long_data[1] #testing
 for (region in long_data) {
@@ -133,9 +132,6 @@ for (region in long_data) {
 print(paste('complete loop:', Sys.time() - start.time))#37 mins, date: 11/08/22
 
 ```
-
-
-
 [1] "East Midlands 2022-08-11 12:30:55"
 [1] "runtime: 2.52524968385696"
 [1] "East of England 2022-08-11 12:33:26"
@@ -160,161 +156,10 @@ print(paste('complete loop:', Sys.time() - start.time))#37 mins, date: 11/08/22
 [1] "runtime: 36.8469352682432"
 
 
-
-
-
-
-
-```{r metadataLong - old}
-start.time <- Sys.time()
-#long_data <- long_data[1] #testing
-for (region in long_data) {
-  print(paste(region, Sys.time()))
-  
-  tmp <- loadRData(paste0("../Data/RData_longitudinal/longitudinalEPCs_",region,".RData") )
-  
-  
-  #first and last entries
-  tmp <- tmp[order(n_GRP,INSPECTION_DATE)]
-  tmp[, n_first :=  min(INSPECTION_DATE), by=list(n_GRP)]
-  tmp[  !is.na(n_first)] #remove where inspection date is NA, e.g, there are 7 in LONDON: 813658 813659 818797 818798 818799 921798 921799
-  
-  tmp[, n_last := max(INSPECTION_DATE), by=list(n_GRP)]
-  
-  #info on repeats
-  tmp[, n_appearance := .N , by=list(n_GRP)]
-  
-  #info on UPRNs differences and NAs
-  tmp[, n_erNoUPRN := ifelse(UPRN == ubdc_UPRN,'same','diffUPRNs')]
-  tmp[, n_erNoUPRN := ifelse(UPRN == "" | is.na(UPRN),'diffUPRNs_NA_UPRN',n_erNoUPRN) ]
-  tmp[, n_erNoUPRN := ifelse(ubdc_UPRN == ""| is.na(ubdc_UPRN),'diffUPRNs_NA_ubdc_UPRN',n_erNoUPRN) ]
-  tmp[, n_erNoUPRN := ifelse(n_UPRN == "" | is.na(n_UPRN),'noUPRN',n_erNoUPRN) ]
-  
-  
-  #testercols <- c( "n_GRP", "CURRENT_ENERGY_RATING", names(tmp)[which(startsWith(names(tmp),'n_'))])
-  
-  
-  #Deltas
-  ##Change in CEE from previous entry
-  tmp[,CURRENT_ENERGY_EFFICIENCY := as.integer(CURRENT_ENERGY_EFFICIENCY) ]
-  tmp[, n_d_cEE := CURRENT_ENERGY_EFFICIENCY - shift(CURRENT_ENERGY_EFFICIENCY , fill = first(CURRENT_ENERGY_EFFICIENCY)), by=list(n_GRP)]
-  tmp[INSPECTION_DATE == n_first, n_d_cEE := NA_integer_]
-  
-  
-  ##Days between previous entry
-  tmp[, n_d_time := as.numeric(difftime(INSPECTION_DATE, 
-                                        shift(INSPECTION_DATE , fill = first(INSPECTION_DATE)),
-                                        units = c("days"))), by=list(n_GRP)]
-  
-  tmp[, n_d_time_same_insp_day := ifelse(n_d_time == 0, 'same_day', ifelse(n_d_time < 8, 'same_week', ifelse(n_d_time < 30, 'same_month', ifelse(n_d_time < 365, 'same_year', 'more_than_yr' ) )))]
-
-
-  #Changes between the first and last, where more than 2 entries
-  tmp[, n_delta_change_first2last := last(CURRENT_ENERGY_EFFICIENCY) - first(CURRENT_ENERGY_EFFICIENCY), by=list(n_GRP)]
-  tmp[  n_last != INSPECTION_DATE, n_delta_change_first2last:= NA]
-  
-  
-  
-  tmp[, n_changeDir_first2last := ifelse(n_delta_change_first2last > 0, 'up', ifelse(n_delta_change_first2last == 0, 'NA', 'down' ) ) ]
-  
-  tmp[, n_changeLetter_first2last := ifelse(last(CURRENT_ENERGY_RATING) == first(CURRENT_ENERGY_RATING),'same','diff'), by=list(n_GRP)]
-  tmp[  n_last != INSPECTION_DATE, n_changeLetter_first2last:= NA]
-  
-  print(paste('runtime:', Sys.time() - start.time))#2 mins
-  
-  #LAD tally:
-  LAD_tally <-  c("LAD11NM","LMK_KEY","n_GRP","CURRENT_ENERGY_RATING","n_appearance","n_erNoUPRN","n_delta_change_first2last","n_changeDir_first2last","n_changeDir_first2last","n_changeLetter_first2last","n_d_time_same_insp_day")
-  LAD_tally <-  tmp[,..LAD_tally]
-  save(LAD_tally, file = paste0("../Outputs/WIP_longitudinal/long_LAD_tally_",region,".RData") )
-  
-  
-  #skinny long, by region:
-  skinny_long <- c("RGN11NM","LAD11NM","LMK_KEY","n_GRP","n_appearance","CURRENT_ENERGY_EFFICIENCY","INSPECTION_DATE","n_d_cEE","n_d_time")
-  skinny_long <-  tmp[INSPECTION_DATE != n_first,..skinny_long]#remove all firsttime entries
-  
-  
-  save(skinny_long, file = paste0("../Outputs/WIP_longitudinal/long_skinny_long_",region,".RData") )
-  print(paste('save time:', Sys.time() - start.time))#2 mins
-  
-  rm(tmp,LAD_tally,skinny_long)
-}
-
-
-```
-
-
-
-```{r}
-#next step:
-## summary <- tmp[,.N, by = c('n_d_time_same_insp_day', 'LAD11NM' )]
-## summary_by_LAD <- reshape(summary, idvar = "LAD11NM", timevar = "N", direction = "wide")
-```
-
-
-```{r}
-region = 'longitudinalEPCs_North East' #small region
-LAD_tally_tmp <- loadRData(paste0("../Outputs/WIP_longitudinal/LAD_tally_",region,".RData") )
-skinny_long_tmp <- loadRData(paste0("../Outputs/WIP_longitudinal/skinny_long",region,".RData") )
-
-names(tmp)[which(startsWith(names(tmp),'n_'))]
-
-```
-
-
-[1] "East Midlands 2022-08-10 08:31:35"
-[1] "runtime: 2.9134230017662"
-[1] "save time: 3.16486191749573"
-
-[1] "East of England 2022-08-10 08:34:45"
-[1] "runtime: 6.46780414978663"
-[1] "save time: 6.67242088317871"
-
-[1] "North East 2022-08-10 08:38:15"
-[1] "runtime: 8.32375133434931"
-[1] "save time: 8.43181811571121"
-
-[1] "North West 2022-08-10 08:40:01"
-[1] "runtime: 12.5715287685394"
-[1] "save time: 12.8831171154976"
-
-[1] "South East 2022-08-10 08:44:28"
-[1] "runtime: 17.3082739671071"
-[1] "save time: 17.602920114994"
-
-[1] "South West 2022-08-10 08:49:11"
-[1] "runtime: 20.1300816853841"
-[1] "save time: 20.3295335332553"
-
-[1] "Unknown 2022-08-10 08:51:55"
-[1] "runtime: 20.3344329833984"
-[1] "save time: 20.3348163326581"
-
-[1] "Wales 2022-08-10 08:51:55"
-[1] "runtime: 22.4443284153938"
-[1] "save time: 22.6198897838593"
-
-[1] "West Midlands 2022-08-10 08:54:12"
-[1] "runtime: 26.8543520649274"
-[1] "save time: 27.1509215831757"
-
-[1] "Yorkshire and The Humber 2022-08-10 08:58:44"
-[1] "runtime: 33.01410886844"
-[1] "save time: 33.1741558988889"
-
-[1] "London 2022-08-10 09:04:45"
-[1] "runtime: 38.6243985335032"
-[1] "save time: 38.979339782397"
-
-
-
-
-
-
-
-
-
 ```{appearance matrix r}
 start.time <- Sys.time()
+
+long <- loadRData(paste0("../Data/RData_longitudinal/longitudinalEPCs_",region,".RData") )
 
 #create appearance_matrix
 tmp <- long %>%
