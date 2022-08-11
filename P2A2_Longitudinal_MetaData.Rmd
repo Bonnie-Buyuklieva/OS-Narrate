@@ -31,28 +31,86 @@ regions <- gsub(".RData","",as.character(regions))
 regions <- gsub("long_LAD_tally_","",as.character(regions))
 ```
 
-```{r loop_uniqueGRPs}
-LAD_table <- list()
 
-for(region in regions){
-  print(paste(region, Sys.time()))
-  tmp_tally <- loadRData(paste0("../Outputs/WIP_longitudinal/long_LAD_tally_",region,".RData") )
-  LADrows <- tmp_tally[,length(unique(n_GRP)), by = c('LAD11NM')]
-  LADrows$region <- region
-  LAD_table <- rbind(LAD_table,LADrows)
+
+
+
+#Counting on RData Directory
+```{r metadata_long}
+#this chunk is moved from Harmonisation
+#get folders
+long_data <- list.files(path = "../Data/RData_longitudinal", pattern = NULL, all.files = FALSE,
+           full.names = FALSE, recursive = FALSE,
+           ignore.case = FALSE, include.dirs = FALSE, no.. = FALSE)
+
+LUT_transaction <- read_excel("../Data/OS-N_EPC_v10_LUT+dictionaries.xlsx", sheet = "TRANSACTION_TYPE",range = cell_cols("B:B"))
+
+metadata_long <- setNames(data.table(matrix(nrow = 0, ncol = lengths(LUT_transaction)+8)), 
+                          c('region','LA','n_row','unique_GRPs' ,'unique_n_UPRN', 'na_n_UPRN', 'na_UPRN', 'GRPrepeat_more_than2x',c(LUT_transaction$TRANSACTION_TYPEfactors)))
+print_counter = 0
+
+start.time <- Sys.time()
+
+#long_data <- long_data[1] #testing
+for (region in long_data) {
+  tmp_region_dt <- loadRData(paste0("../Data/RData_longitudinal/",region) )
+  print(region)
+  
+  #for(LA in unique(tmp_region_dt[, LAD11NM])[1:5] ){#testing
+  for(LA in unique(tmp_region_dt[, LAD11NM]) ){  
+    
+      print_counter = print_counter+1
+      if(print_counter %% 20 == 0){print(LA)} 
+    
+    tmp_dt_subset <- tmp_region_dt[LAD11NM == LA,]
+    tmp_dt_subset[, n_appearance := .N , by=list(n_GRP)]
+    
+    
+    n_row <- lengths(tmp_dt_subset)[1]
+    
+    unique_GRPs <- length(unique(tmp_dt_subset$n_GRP))
+    
+    unique_n_UPRN <- length(unique(tmp_dt_subset$n_UPRN))
+    na_n_UPRN <- sum(is.na(tmp_dt_subset$n_UPRN))
+    na_UPRN <- sum(is.na(tmp_dt_subset$UPRN))
+    
+    #groups!
+    repeat_more_than2x <- lengths(tmp_dt_subset[ n_appearance > 2, .N , by=list(n_GRP)])[1]
+    
+    #cleanUp the region
+    region <- gsub(".*_", "", region)
+    region <- gsub(".RData", "", region)
+    
+    #add transaction tally 
+    transactionDt <- tmp_dt_subset[, .N, by=.(TRANSACTION_TYPE)]
+    #compains here. ? use.names=FALSE
+    #Test: East Midlands: North-East-Derbyshire, Harborough, 
+    #Oadby-and-Wigston - unknown & Stock Condition Survey gives NAs
+    
+
+    trans <- transactionDt$N[match(LUT_transaction$TRANSACTION_TYPEfactors,transactionDt$TRANSACTION_TYPE)]
+    
+    
+    row <- c(region, LA, n_row, unique_GRPs, unique_n_UPRN, na_n_UPRN,na_UPRN,repeat_more_than2x, trans)
+    
+    metadata_long <- rbindlist(list(metadata_long, as.list(row)) )
+    rm(tmp_dt_subset)
+    
+  }
 }
 
-names(LAD_table) <- c("LAD11NM","N_unique_GRPs","region")
-LAD_table <- LAD_table[,c("region","LAD11NM","N_unique_GRPs")]
-LAD_table$N_unique_GRPs <- as.numeric(LAD_table$N_unique_GRPs)
+write.xlsx(metadata_long,
+             file = "../Data/OS-N_EPC_v10_Overviews.xlsx", sheetName="meta_data_long", append=TRUE)
 
-write.xlsx(LAD_table,
-             file = "../Data/LAD_Longitudinal_Summary.xlsx", sheetName="uniqueGRPs", append=TRUE)
-   
-   
+print(paste('runtime:', Sys.time() - start.time))
+#5 mins, date: 10/08/22
 ```
 
 
+
+
+
+#quick Checks_
 
 ```{r loop_uniqueGRPs}
 LAD_table <- list()
@@ -83,6 +141,9 @@ for(region in regions){
   print(paste(region, Sys.time()))
   tmp_tally <- loadRData(paste0("../Outputs/WIP_longitudinal/long_LAD_tally_",region,".RData") )
   LADrows <- tmp_tally[n_erNoUPRN ==  "noUPRN",.N, by = c('LAD11NM', 'n_GRP')]
+  
+  
+   tmp[, n_erNoUPRN := ifelse(n_UPRN == "" | is.na(n_UPRN),'noUPRN',n_erNoUPRN) ]
   LADrows$region <- region
   
   
@@ -98,29 +159,6 @@ write.xlsx(LAD_table,
              file = "../Data/LAD_Longitudinal_Summary.xlsx", sheetName="noUPRN", append=TRUE)
 ```
 
-
-```{r testing}
-tmp_skinny <- loadRData(paste0("../Outputs/WIP_longitudinal/long_LAD_tally_",region,".RData") ) 
-
-LAD_table <- list()
-
-for(region in regions)
-    print(paste(region, Sys.time()))
-
-region <- regions[3]
-
-print()
-tmp_tally <- loadRData(paste0("../Outputs/WIP_longitudinal/long_LAD_tally_",region,".RData") )
-
-
-LADrows <- tmp_tally[,length(unique(n_GRP)), by = c('LAD11NM')]
-LADrows$region <- region
-
-
-LAD_table <- rbind(LADrows,LADrows)
-
-
-```
 
 
 

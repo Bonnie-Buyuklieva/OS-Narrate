@@ -33,7 +33,7 @@ LUT_tenure <- read_excel("../Data/OS-N_EPC_v10_LUT+dictionaries.xlsx", sheet = "
 
 
 #slow?!
-LAD_row_tally_after_replace_by_LUT <- function(tmp = tmp, tmp_col_topic ='TENURE', harm_LUT = LUT_tenure, reg = region, LAD = LA){
+LAD_row_tally_after_replace_by_LUT <- function(tmp = tmp, tmp_col ='TENURE', harm_LUT = LUT_tenure, reg = region, LAD = LA){
 
   harm_LUT <- data.table(harm_LUT)
   LUT_colum <- harm_LUT[match( c(unlist( tmp[,..tmp_col_topic])), c(unlist(harm_LUT[,1])) ),"harmonisation"]
