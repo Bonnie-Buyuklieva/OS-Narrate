@@ -118,6 +118,8 @@ LAD_table <- list()
 for(region in regions){
   print(paste(region, Sys.time()))
   tmp_tally <- loadRData(paste0("../Outputs/WIP_longitudinal/long_LAD_tally_",region,".RData") )
+
+
   LADrows <- tmp_tally[,length(unique(n_GRP)), by = c('LAD11NM')]
   LADrows$region <- region
   

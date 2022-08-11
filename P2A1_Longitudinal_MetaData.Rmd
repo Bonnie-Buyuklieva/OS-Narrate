@@ -28,28 +28,144 @@ long_data <- list.files(path = "../Data/RData_longitudinal", pattern = NULL, all
 long_data <- long_data[c(1,2,c(seq(4,11,by=1)),3)]
 long_data <- gsub(".RData","",as.character(long_data))
 long_data <- gsub("longitudinalEPCs_","",as.character(long_data))
+
+#get loopUp
+LUT_tenure <- read_excel("../Data/OS-N_EPC_v10_LUT+dictionaries.xlsx", sheet = "TENURE",range = cell_cols("B:C"))
+LUT_builtForm <- read_excel("../Data/OS-N_EPC_v10_LUT+dictionaries.xlsx", sheet = "BUILT_FORM",range = cell_cols("B:C"))
 ```
 
-```{r test set up}
-if(F){
- region <- "South West"
-load(paste0("../Data/RData_longitudinal/longitudinalEPCs_",region,".RData"))
-long <- longitudinalEPCs_long
 
-region <- "Unknown"
-load(paste0("../Data/RData_crossSectional/crossSectional_",region,".RData"))
-#does have n_UPRN to be counted
-cross <- mapping
+```{r metadataLong new}
+start.time <- Sys.time()
+#long_data <- long_data[1] #testing
+for (region in long_data) {
+  print(paste(region, Sys.time()))
+  
+  tmp <- loadRData(paste0("../Data/RData_longitudinal/longitudinalEPCs_",region,".RData") )
+  
+  #N1-2: first and last entries
+  tmp <- tmp[order(n_GRP,INSPECTION_DATE)]
+  tmp[, n_first :=  min(INSPECTION_DATE), by=list(n_GRP)]
+  tmp[  !is.na(n_first)] #remove where inspection date is NA, e.g, there are 7 in LONDON: 813658 813659 818797 818798 818799 921798 921799
+  
+  tmp[, n_last := max(INSPECTION_DATE), by=list(n_GRP)]
+  
+  
+  #N3: info on repeats
+  tmp[, n_appearance := .N , by=list(n_GRP)]
+  
+  #N4: info on UPRNs differences and NAs
+  tmp[, n_erNoUPRN := ifelse(UPRN == ubdc_UPRN,'same','diffUPRNs')]
+  tmp[, n_erNoUPRN := ifelse(UPRN == "" | is.na(UPRN),'diffUPRNs_NA_UPRN',n_erNoUPRN) ]
+  tmp[, n_erNoUPRN := ifelse(ubdc_UPRN == ""| is.na(ubdc_UPRN),'diffUPRNs_NA_ubdc_UPRN',n_erNoUPRN) ]
+  tmp[, n_erNoUPRN := ifelse(n_UPRN == "" | is.na(n_UPRN),'noUPRN',n_erNoUPRN) ]
+  
+  
+  
+  #Deltas
+  ##N5: n_d_CEE_ Change in CEE from previous entry
+  tmp[,CURRENT_ENERGY_EFFICIENCY := as.integer(CURRENT_ENERGY_EFFICIENCY) ]
+  tmp[, n_d_cEE := CURRENT_ENERGY_EFFICIENCY - shift(CURRENT_ENERGY_EFFICIENCY , fill = first(CURRENT_ENERGY_EFFICIENCY)), by=list(n_GRP)]
+  tmp[INSPECTION_DATE == n_first, n_d_cEE := NA_integer_]
+  
+  
+  ##N6: n_d_time Days between previous entry
+  tmp[, n_d_time := as.numeric(difftime(INSPECTION_DATE, 
+                                        shift(INSPECTION_DATE , fill = first(INSPECTION_DATE)),
+                                        units = c("days"))), by=list(n_GRP)]
+  
+  ##N7: days by group
+  tmp[, n_d_time_same_insp_day := ifelse(n_d_time == 0, 'same_day', 
+                                         ifelse(n_d_time < 8, 'same_week', 
+                                                ifelse(n_d_time < 30, 'same_month', 
+                                                       ifelse(n_d_time < 365, 'same_year', 'more_than_yr' ) )))]
 
-delta_cols <-  c("LMK_KEY","n_GRP","INSPECTION_DATE","RGN11NM","LAD11NM","UPRN","ubdc_UPRN","n_UPRN","CURRENT_ENERGY_EFFICIENCY", "CURRENT_ENERGY_RATING")
-tmp <- long[1:500]
-region <- 'region' 
+
+  #N8: Changes between the first and last, where more than 2 entries
+  tmp[, n_delta_change_first2last := last(CURRENT_ENERGY_EFFICIENCY) - first(CURRENT_ENERGY_EFFICIENCY), by=list(n_GRP)]
+  tmp[  n_last != INSPECTION_DATE, n_delta_change_first2last:= NA]
+  
+  
+  #N9: 
+  tmp[, n_changeDir_first2last := ifelse(n_delta_change_first2last > 0, 'up', ifelse(n_delta_change_first2last == 0, 'NA', 'down' ) ) ]
+  
+  #N10: 
+  tmp[, n_changeLetter_first2last := ifelse(last(CURRENT_ENERGY_RATING) == first(CURRENT_ENERGY_RATING),'same','diff'), by=list(n_GRP)]
+  tmp[  n_last != INSPECTION_DATE, n_changeLetter_first2last:= NA]
+  
+  
+  #N11: create C relative column
+  tmp[, n_Crel:= ifelse(CURRENT_ENERGY_RATING == 'C', 'C', 
+                                ifelse(CURRENT_ENERGY_RATING %in% c('A', 'B'), 'C+', 
+                                       ifelse(CURRENT_ENERGY_RATING %in% c('D', 'E','F','G'),'C-','NA' )))]
+  tmp[n_Crel =="NA", n_Crel:= ifelse(CURRENT_ENERGY_EFFICIENCY > 100, 'C+', 'C-')]#DEALs with: tmp[CURRENT_ENERGY_RATING =="INVALID!", ]$CURRENT_ENERGY_EFFICIENCY
+  
+  
+  #N12: create new Tenure column
+  LUT_colum <- LUT_tenure[match(tmp$TENURE, LUT_tenure$tenure_factors),"harmonisation"]
+  tmp[,n_tenure := LUT_colum]
+  tmp[is.na(n_tenure),n_tenure := 'unknown'] #deals with NAs
+      
+  #N13: create new Built Form column
+  LUT_colum <- LUT_builtForm[match(tmp$BUILT_FORM, LUT_builtForm$BUILT_FORMfactors),"harmonisation"]
+  tmp[,n_builtForm := LUT_colum]
+  tmp[is.na(n_builtForm),n_builtForm := 'unknown'] 
+  
+  
+  keepCols <- c(names(tmp)[which(startsWith(names(tmp),'n_'))])
+  keepCols <- c("LAD11NM","LMK_KEY",
+                 "CURRENT_ENERGY_EFFICIENCY","ENERGY_CONSUMPTION_CURRENT","POTENTIAL_ENERGY_EFFICIENCY",
+                 "str_concat","UPRN","ubdc_UPRN",
+                 "TRANSACTION_TYPE","INSPECTION_DATE",
+                 "TENURE","BUILT_FORM","PROPERTY_TYPE", newcols) 
+  
+  
+  
+  tmp <-tmp[,..keepCols]
+
+  
+  save(tmp, file = paste0("../Outputs/WIP_longitudinal/longitudinal_baseline_",region,".RData") )
+  
+  
+  
+  print(paste('runtime:', Sys.time() - start.time))
 }
+print(paste('complete loop:', Sys.time() - start.time))#37 mins, date: 11/08/22
 
 ```
 
 
-```{r metadataLong}
+
+[1] "East Midlands 2022-08-11 12:30:55"
+[1] "runtime: 2.52524968385696"
+[1] "East of England 2022-08-11 12:33:26"
+[1] "runtime: 5.47735566695531"
+[1] "North East 2022-08-11 12:36:24"
+[1] "runtime: 6.864215584596"
+[1] "North West 2022-08-11 12:37:47"
+[1] "runtime: 10.468202984333"
+[1] "South East 2022-08-11 12:41:23"
+[1] "runtime: 15.382263036569"
+[1] "South West 2022-08-11 12:46:18"
+[1] "runtime: 18.2168222864469"
+[1] "Unknown 2022-08-11 12:49:08"
+[1] "runtime: 18.2234247684479"
+[1] "Wales 2022-08-11 12:49:08"
+[1] "runtime: 19.8268858035405"
+[1] "West Midlands 2022-08-11 12:50:45"
+[1] "runtime: 22.7070034344991"
+[1] "Yorkshire and The Humber 2022-08-11 12:53:37"
+[1] "runtime: 26.1602946837743"
+[1] "London 2022-08-11 12:57:05"
+[1] "runtime: 36.8469352682432"
+
+
+
+
+
+
+
+```{r metadataLong - old}
 start.time <- Sys.time()
 #long_data <- long_data[1] #testing
 for (region in long_data) {
@@ -70,9 +186,9 @@ for (region in long_data) {
   
   #info on UPRNs differences and NAs
   tmp[, n_erNoUPRN := ifelse(UPRN == ubdc_UPRN,'same','diffUPRNs')]
-  tmp[, n_erNoUPRN := ifelse(UPRN == "" || is.na(UPRN),'diffUPRNs_NA_UPRN',n_erNoUPRN) ]
-  tmp[, n_erNoUPRN := ifelse(ubdc_UPRN == ""|| is.na(ubdc_UPRN),'diffUPRNs_NA_ubdc_UPRN',n_erNoUPRN) ]
-  tmp[, n_erNoUPRN := ifelse(n_UPRN == "" || is.na(n_UPRN),'noUPRN',n_erNoUPRN) ]
+  tmp[, n_erNoUPRN := ifelse(UPRN == "" | is.na(UPRN),'diffUPRNs_NA_UPRN',n_erNoUPRN) ]
+  tmp[, n_erNoUPRN := ifelse(ubdc_UPRN == ""| is.na(ubdc_UPRN),'diffUPRNs_NA_ubdc_UPRN',n_erNoUPRN) ]
+  tmp[, n_erNoUPRN := ifelse(n_UPRN == "" | is.na(n_UPRN),'noUPRN',n_erNoUPRN) ]
   
   
   #testercols <- c( "n_GRP", "CURRENT_ENERGY_RATING", names(tmp)[which(startsWith(names(tmp),'n_'))])
@@ -92,9 +208,7 @@ for (region in long_data) {
   
   tmp[, n_d_time_same_insp_day := ifelse(n_d_time == 0, 'same_day', ifelse(n_d_time < 8, 'same_week', ifelse(n_d_time < 30, 'same_month', ifelse(n_d_time < 365, 'same_year', 'more_than_yr' ) )))]
 
-  
-  
-  
+
   #Changes between the first and last, where more than 2 entries
   tmp[, n_delta_change_first2last := last(CURRENT_ENERGY_EFFICIENCY) - first(CURRENT_ENERGY_EFFICIENCY), by=list(n_GRP)]
   tmp[  n_last != INSPECTION_DATE, n_delta_change_first2last:= NA]
