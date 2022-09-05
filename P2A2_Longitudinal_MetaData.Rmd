@@ -87,7 +87,7 @@ for(region in regions){
   LADrows <- tmp_tally[,length(unique(n_GRP)), by = c('LAD11NM')]
   LADrows$region <- region
   
-  LAD_table <- rbind(LAD_table,LADrows)
+  LAD_table <- rbind(LAD_table,LADrows, fill = TRUE)
 }
 
 names(LAD_table) <- c("LAD11NM","N_unique_GRPs","region")

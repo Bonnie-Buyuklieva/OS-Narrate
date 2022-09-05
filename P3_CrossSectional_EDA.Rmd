@@ -1,0 +1,135 @@
+---
+title: "P3_CrossSectional_EDA"
+author: "Boyana Buyuklieva"
+date: "August 30, 2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(tidyverse)
+library(data.table)
+library(readxl)
+library(readr)
+
+
+
+loadRData <- function(fileName){
+    #loads an RData file, and returns it
+    load(fileName)
+    get(ls()[ls() != "fileName"])
+}
+
+EDA_cols <- read_csv("../Data/EDA_colour_scheme.csv")
+EDA_cols <- subset(EDA_cols[EDA_cols$geography_name %in%  cross_data, ])
+```
+
+
+
+
+
+
+
+
+```{r}
+
+output, file = paste0("../Outputs/WIP_crossSectional/ONSUD_crossSectional_baseline_",WIP,".RData"
+
+```
+
+
+
+
+```{r}
+#not working
+regional_plots <- list()
+start.time <- Sys.time()
+
+for (region in cross_data) {
+  print(paste(region, Sys.time()))
+  region_df <- loadRData(paste0("../Data/RData_crossSectional/crossSectional_",region,".RData") )
+  region_df$CURRENT_ENERGY_EFFICIENCY <- as.numeric(region_df$CURRENT_ENERGY_EFFICIENCY )
+  
+  #Plot prep
+  ##set all the values that are over 100 to 101, EPCs aren't bound to 100 
+  region_df[CURRENT_ENERGY_EFFICIENCY > 101]$CURRENT_ENERGY_EFFICIENCY <- 101
+  EDA_col <-  EDA_cols$colour[which(EDA_cols$geography_name %in% region)]
+  
+  #regional_plots[[region]] <-  geom_density(data = region_df, aes(CURRENT_ENERGY_EFFICIENCY, colour = n_tenure))
+  regional_plots[[region]] <-  geom_density(data = region_df, aes(CURRENT_ENERGY_EFFICIENCY, colour = eval(EDA_col)) )
+}
+
+print(paste('loop time:', Sys.time() - start.time))#plot loop takes 40mins
+
+
+
+ggplot() + regional_plots[]
+
+```
+
+
+
+
+
+
+```{r testing_sample}
+region <- cross_data[4]
+
+region_df<- loadRData( paste0("../Outputs/WIP_crossSectional/crossSectional_baseline_",region,".RData") )
+
+
+tmp_region_df <- head(region_df, 200)
+  
+
+ggplot() + geom_density(data = tail(region_df, 100), 
+                        aes(CURRENT_ENERGY_EFFICIENCY, by = n_tenure, colour = n_tenure),
+                        cut(0,100))
+
+
+
+library(scales) # For percent_format()
+
+ggplot(tail(region_df, 100), aes(CURRENT_ENERGY_EFFICIENCY, fill=n_tenure, colour=n_tenure)) +
+  geom_histogram(aes(y=2*(..density..)/sum(..density..)), breaks=seq(0,100,1), alpha=0.6, 
+                 position="identity", lwd=0.2) +
+  scale_y_continuous(labels=percent_format())
+
+
+
+```
+
+```{r density_plot}
+#set all the values that are over 100 to 101, EPCs aren't bound to 100 
+plot_obj <-  ggplot(tmp_region_df) +
+             geom_density(aes(CURRENT_ENERGY_EFFICIENCY, colour = n_tenure))
+
+
+
+#Internet: 
+#is these a way to save ggplot object without the raw data?
+plot_obj$data <- NULL
+plot_obj$layers
+```
+
+
+```{r formatting}
+#formatting:
+lettermapping <-  data.frame( letter = c('A','B','C','D','E','F','G'), 
+                              cutoff = c(92, 81, 69, 55, 39, 21, 1))
+  
+plot_obj + 
+  geom_vline( xintercept =  lettermapping$cutoff, colour = 'grey', size=1)+ 
+  annotate("text",x = lettermapping$cutoff+5, y= 0.1, label=lettermapping$letter, angle=90, size=5)+
+  theme_classic() + theme(legend.position = 'bottom', legend.box = 'horizontal')
+
+```
+
+
+
+```{r ordered_scater}
+#CEE - Usage variable   
+#environmental impact rating. 
+#potential vs current 
+```
+

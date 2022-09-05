@@ -1,7 +1,7 @@
 ---
 title: "Tenure - EPCs in V10"
 author: "Boyana Buyuklieva"
-date: "May 4, 2022"
+date: "Aug 8, 2022"
 output: html_document
 ---
 
@@ -31,63 +31,60 @@ cross_data <- gsub("crossSectional_","",as.character(cross_data))
 #get loopUp
 LUT_tenure <- read_excel("../Data/OS-N_EPC_v10_LUT+dictionaries.xlsx", sheet = "TENURE",range = cell_cols("B:C"))
 LUT_builtForm <- read_excel("../Data/OS-N_EPC_v10_LUT+dictionaries.xlsx", sheet = "BUILT_FORM",range = cell_cols("B:C"))
-
+#add builing age here
 ```
 
 
 
-```{r baseline_loop}
-for (region in cross_data) {
-  #N2: count number of instances 
-  tmp[, n_N := .N,  by = list(LAD11NM)]
-  
-  #N3: create C relative column
-  tmp[, n_Crel:= ifelse(CURRENT_ENERGY_RATING == 'C', 'C', 
-                                ifelse(CURRENT_ENERGY_RATING %in% c('A', 'B'), 'C+', 
-                                       ifelse(CURRENT_ENERGY_RATING %in% c('D', 'E','F','G'),'C-','NA' )))]
-}
-```
-
-```{r LUT_loop}
+```{r loop_template}
 LAD_table <- data.table()
 start.time <- Sys.time()
+
+for (region in cross_data) {
+  print(paste(region, Sys.time()))
+  tmp <- loadRData(paste0("../Data/RData_crossSectional/crossSectional_",region,".RData") )
   
-  for (region in cross_data) {
-    
-    print(paste(region, Sys.time()))
-    tmp <- loadRData(paste0("../Data/RData_crossSectional/crossSectional_",region,".RData") )
-    
-    for (LA in unique(tmp$LAD11NM)) {
-      
-      tmp_LA <- tmp[ LAD11NM == LA, c('CURRENT_ENERGY_RATING','TENURE','BUILT_FORM')]
-
-      
-      #N1: create C relative column
-      tmp_LA[, n_Crel:= ifelse(CURRENT_ENERGY_RATING == 'C', 'C', 
-                                ifelse(CURRENT_ENERGY_RATING %in% c('A', 'B'), 'C+', 
-                                       ifelse(CURRENT_ENERGY_RATING %in% c('D', 'E','F','G'),'C-','NA' )))]
-      #N2: create new Tenure column
-      LUT_colum <- LUT_tenure[match(tmp_LA$TENURE, LUT_tenure$tenure_factors),"harmonisation"]
-      tmp_LA[,n_tenure := LUT_colum]
-      tmp_LA[is.na(n_tenure),n_tenure := 'unknown'] #deals with NAs
-      
-      #N2: create new Built Form column
-      LUT_colum <- LUT_builtForm[match(tmp_LA$BUILT_FORM, LUT_builtForm$BUILT_FORMfactors),"harmonisation"]
-      tmp_LA[,n_builtForm := LUT_colum]
-      tmp_LA[is.na(n_builtForm),n_builtForm := 'unknown'] 
-      
-      t_LAD_row <- tmp_LA[,.N ,by = c('n_tenure','n_builtForm','n_Crel')]
-      
-      #test <- reshape(long, idvar = "LAD11NM", timevar = "n_erNoUPRN", direction = "wide")
-      #test$region <- region
-
-      #LAD_table <- rbind(LAD_table,test, fill = TRUE)
-      
-    }
+  
+  for (LA in unique(tmp$LAD11NM)) {
+    tmp_LA <- tmp # tmp[ LAD11NM == LA, c('a','b','c')]
+    #t_LAD_row <- tmp_LA[,.N ,by = c('x','y','z')]
   }
-#LAD_table[is.na(LAD_table)] <- "0"#set 0 for NAs
+}
 
-write.xlsx(LAD_table,
-             file = "../Data/CrossSectional_Summary.xlsx", sheetName="Crosstabulation", append=TRUE)
-print(paste('loop time:', Sys.time() - start.time))#14 mins
+print(paste('loop time:', Sys.time() - start.time))#empty loop runs about 10 mins
+
+if(F){
+  save(tmp, file = paste0("../Outputs/WIP_crossSectional/crossSectional_baseline_",region,".RData") )
+  write.xlsx(LAD_table,
+             file = "../Data/CrossSectional_Summary.xlsx", sheetName="SHEET", append=TRUE)
+}
+
+print(paste('save time:', Sys.time() - start.time))
+```
+
+
+```{r loop_data_query}
+LAD_table <- data.table()
+start.time <- Sys.time()
+
+for (region in cross_data) {
+  print(paste(region, Sys.time()))
+  tmp <- loadRData(paste0("../Data/RData_crossSectional/crossSectional_",region,".RData") )
+  
+  
+  for (LA in unique(tmp$LAD11NM)) {
+    tmp_LA <- tmp # tmp[ LAD11NM == LA, c('a','b','c')]
+    #t_LAD_row <- tmp_LA[,.N ,by = c('x','y','z')]
+  }
+}
+
+print(paste('loop time:', Sys.time() - start.time))#empty loop runs about 10 mins
+
+if(F){
+  save(tmp, file = paste0("../Outputs/WIP_crossSectional/crossSectional_baseline_",region,".RData") )
+  write.xlsx(LAD_table,
+             file = "../Data/CrossSectional_Summary.xlsx", sheetName="SHEET", append=TRUE)
+}
+
+print(paste('save time:', Sys.time() - start.time))
 ```
