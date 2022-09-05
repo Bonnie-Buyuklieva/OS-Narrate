@@ -33,8 +33,68 @@ EDA_cols <- subset(EDA_cols[EDA_cols$geography_name %in%  cross_data, ])
 
 
 ```{r}
+dt_LSOA <- data.table()
+dt_LSOA_tenure <- data.table()
 
-output, file = paste0("../Outputs/WIP_crossSectional/ONSUD_crossSectional_baseline_",WIP,".RData"
+for (WIP in EDA_cols$geography_name) {
+ if(WIP == "Unknown") break; 
+ region_df <- loadRData(paste0("../Outputs/WIP_crossSectional/ONSUD_crossSectional_baseline_",WIP,".RData") ) 
+ region_df$CURRENT_ENERGY_EFFICIENCY <- as.numeric(region_df$CURRENT_ENERGY_EFFICIENCY)
+ 
+ 
+ dt_LSOA_row <- region_df[,by = c('lsoa11cd'),
+                  .(n_lsoaCount_raw = .N,
+                    n_lsoaMedian_CEE = median(CURRENT_ENERGY_EFFICIENCY),
+                    n_lsoaVar_CEE = var(CURRENT_ENERGY_EFFICIENCY),
+                    n_lsoaMedian_PEE = median(POTENTIAL_ENERGY_EFFICIENCY),
+                    n_lsoaVar_PEE = var(POTENTIAL_ENERGY_EFFICIENCY)
+                    )]
+ 
+ dt_LSOA <- rbindlist( list(dt_LSOA, dt_LSOA_row)  )
+
+
+ dt_LSOA_tenure_row <- region_df[,by = c('lsoa11cd','n_tenure'),
+                  .(n_lsoaCount_raw = .N,
+                    n_lsoaMedian_CEE = median(CURRENT_ENERGY_EFFICIENCY),
+                    n_lsoaVar_CEE = var(CURRENT_ENERGY_EFFICIENCY),
+                    n_lsoaMedian_PEE = median(POTENTIAL_ENERGY_EFFICIENCY),
+                    n_lsoaVar_PEE = var(POTENTIAL_ENERGY_EFFICIENCY)
+                    )]
+ 
+ dt_LSOA_tenure <- rbindlist( list(dt_LSOA_tenure, dt_LSOA_tenure_row)  )
+ 
+ print(WIP)
+}
+
+
+WIP = EDA_cols$geography_name[1]
+region_df <- loadRData(paste0("../Outputs/WIP_crossSectional/ONSUD_crossSectional_baseline_",WIP,".RData") ) 
+
+  
+tmp <- head(region_df,20)
+tmp <- tmp[order(lsoa11cd),]
+checker <- c("lsoa11cd","str_concat","CURRENT_ENERGY_EFFICIENCY","n_tenure","n_builtForm",'n_lsoaCount')
+View(tmp[, ..checker])
+
+a <- tmp[ , n_lsoaCount_raw := .N, by = lsoa11cd]
+tmp[, n_lsoaMedian_CEE := median(CURRENT_ENERGY_EFFICIENCY), by = lsoa11cd]
+
+tmp[, n_lsoaCount_tenure := .N, by = c(lsoa11cd, n_tenure)]
+
+
+
+t_LSOA_row <- tmp[,by = c('lsoa11cd'),
+                  .(n_lsoaMedian_CEE = median(CURRENT_ENERGY_EFFICIENCY),
+                    n_lsoaMedian_PEE = median(POTENTIAL_ENERGY_EFFICIENCY),
+                    n_lsoaCount_raw = .N)]
+
+
+t_LSOA_tenure_row <- tmp[,by = c('lsoa11cd','tenure'),
+                  .(n_lsoaMedian_CEE = median(CURRENT_ENERGY_EFFICIENCY),
+                    n_lsoaMedian_PEE = median(POTENTIAL_ENERGY_EFFICIENCY),
+                    n_lsoaCount_raw = .N)]
+
+#expecting 32,844 lsoas
 
 ```
 
@@ -104,12 +164,6 @@ ggplot(tail(region_df, 100), aes(CURRENT_ENERGY_EFFICIENCY, fill=n_tenure, colou
 plot_obj <-  ggplot(tmp_region_df) +
              geom_density(aes(CURRENT_ENERGY_EFFICIENCY, colour = n_tenure))
 
-
-
-#Internet: 
-#is these a way to save ggplot object without the raw data?
-plot_obj$data <- NULL
-plot_obj$layers
 ```
 
 
