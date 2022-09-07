@@ -1,0 +1,106 @@
+---
+title: "P3_CrossSectional_EDA"
+author: "Boyana Buyuklieva"
+date: "August 30, 2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(tidyverse)
+library(data.table)
+library(readxl)
+library(readr)
+
+loadRData <- function(fileName){
+    #loads an RData file, and returns it
+    load(fileName)
+    get(ls()[ls() != "fileName"])
+}
+
+#get folders
+cross_data <- list.files(path = "../Data/RData_crossSectional", pattern = NULL, all.files = FALSE,
+           full.names = FALSE, recursive = FALSE,
+           ignore.case = FALSE, include.dirs = FALSE, no.. = FALSE)
+
+cross_data <- gsub(".RData","",as.character(cross_data))
+cross_data <- gsub("crossSectional_","",as.character(cross_data))
+
+EDA_cols <- read_csv("../Data/EDA_colour_scheme.csv")
+EDA_cols <- subset(EDA_cols[EDA_cols$geography_name %in%  cross_data, ])
+```
+
+
+```{r}
+#formatting:
+lettermapping <-  data.frame( letter = c('A','B','C','D','E','F','G'), 
+                              cutoff = c(92, 81, 69, 55, 39, 21, 0))
+
+regional_histo_plots <- list()
+start.time <- Sys.time()
+
+for (WIP in EDA_cols$geography_name) {
+ if(WIP == "Unknown") break; 
+ region_df <- loadRData(paste0("../Outputs/WIP_crossSectional/ONSUD_crossSectional_baseline_",WIP,".RData") ) 
+ region_df$CURRENT_ENERGY_EFFICIENCY <- as.numeric(region_df$CURRENT_ENERGY_EFFICIENCY)
+ print(paste(WIP, Sys.time()))
+  
+  #Plot prep
+  ##set all the values that are over 100 to 101, EPCs aren't bound to 100 
+  region_df[CURRENT_ENERGY_EFFICIENCY > 101]$CURRENT_ENERGY_EFFICIENCY <- 101
+  EDA_col <-  EDA_cols$colour[which(EDA_cols$geography_name %in% WIP)]
+  
+  
+  
+  
+  print(ggplot() + geom_histogram(data = region_df, 
+                              aes(CURRENT_ENERGY_EFFICIENCY , fill = I(EDA_col), alpha=0.9 ),
+                              binwidth = 1)+
+  geom_vline( xintercept =  lettermapping$cutoff, colour = 'grey', size=.6)+ 
+  annotate("text",x = lettermapping$cutoff+5, y= 0.1, label=lettermapping$letter, angle=90, size=5)+
+  #theme_classic() +
+  theme_minimal()+
+  theme(legend.position = 'bottom', legend.box = 'horizontal')+
+  scale_x_continuous(name = 'Current Energy Efficiency' , breaks= lettermapping$cutoff)+
+  scale_y_continuous(name = 'Count of EPCs' ,breaks=seq(0,100000,10000))+
+  theme(legend.position="none")+
+  labs(title = WIP,
+         tag = paste0("N = ", format(lengths(region_df)[1], big.mark=" ", trim=TRUE)) ) )
+}
+```
+
+
+
+```{r}
+big_Dt <- data.table()
+for (WIP in EDA_cols$geography_name) {
+ if(WIP == "Unknown") break; 
+ region_df <- loadRData(paste0("../Outputs/WIP_crossSectional/ONSUD_crossSectional_baseline_",WIP,".RData") ) 
+ region_df$CURRENT_ENERGY_EFFICIENCY <- as.numeric(region_df$CURRENT_ENERGY_EFFICIENCY)
+ region_df$regionName
+ big_Dt <- rbindlist(list(big_Dt,region_df))
+}
+ 
+
+
+
+
+library(ggridges)
+
+ggplot(big_Dt, aes(x=CURRENT_ENERGY_EFFICIENCY, y = regionName, fill=factor(..quantile..))) +
+    stat_density_ridges(geom = "density_ridges_gradient", calc_ecdf = TRUE, quantiles = c(0.25, 0.50), scale = 1,
+                        from = 0, to = 100) +
+    scale_fill_manual(values = c("#76b5c5", "#A0A0A0A0", "#C09085"),
+                      name = NULL,
+                      labels = c("lower 25%", "middle 50%", "upper 25%"))+
+  scale_x_continuous(name = 'Current Energy Efficiency' , breaks= lettermapping$cutoff)+
+  geom_vline( xintercept =  lettermapping$cutoff, colour = 'grey', size=.6)+ 
+  annotate("text",x = lettermapping$cutoff+5, y= 0.1, label=lettermapping$letter, angle=90, size=5)+
+  #theme_classic() +
+  theme_minimal()+
+  theme(legend.position = 'bottom', legend.box = 'horizontal')+
+  scale_x_continuous(name = 'Current Energy Efficiency' , breaks= lettermapping$cutoff)
+```
+
+

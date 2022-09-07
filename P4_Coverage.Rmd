@@ -1,0 +1,31 @@
+---
+title: "P3_CrossSectional_EDA"
+author: "Boyana Buyuklieva"
+date: "August 30, 2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(tidyverse)
+library(data.table)
+library(readxl)
+library(readr)
+
+loadRData <- function(fileName){
+    #loads an RData file, and returns it
+    load(fileName)
+    get(ls()[ls() != "fileName"])
+}
+
+EDA_cols <- read_csv("../Data/EDA_colour_scheme.csv")
+EDA_cols <- subset(EDA_cols[EDA_cols$geography_name %in%  cross_data, ])
+```
+
+```{r estimating UPRN coverage}
+#ONS gives a count of UPRNs by OA (oa11cd) in England and other OA-aggregates. 
+
+
+
+```

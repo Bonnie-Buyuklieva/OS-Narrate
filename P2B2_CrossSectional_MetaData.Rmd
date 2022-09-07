@@ -29,10 +29,48 @@ cross_data <- gsub("crossSectional_","",as.character(cross_data))
 
 
 #get loopUp
-LUT_tenure <- read_excel("../Data/OS-N_EPC_v10_LUT+dictionaries.xlsx", sheet = "TENURE",range = cell_cols("B:C"))
-LUT_builtForm <- read_excel("../Data/OS-N_EPC_v10_LUT+dictionaries.xlsx", sheet = "BUILT_FORM",range = cell_cols("B:C"))
-#add builing age here
+LUT_ageBand <- read_excel("../Data/OS-N_EPC_v10_LUT+dictionaries.xlsx", sheet = "CONSTRUCTION_AGE_BAND",range = cell_cols("B:C"))
+
 ```
+
+
+```{r additional_data}
+LAD_table <- data.table()
+start.time <- Sys.time()
+
+cols <- c("LMK_KEY","POSTCODE",
+            "ENVIRONMENT_IMPACT_CURRENT","ENVIRONMENT_IMPACT_POTENTIAL",
+            "CO2_EMISS_CURR_PER_FLOOR_AREA","TOTAL_FLOOR_AREA",
+            "EXTENSION_COUNT","NUMBER_HABITABLE_ROOMS","NUMBER_HEATED_ROOMS",
+            "INSPECTION_DATE","TRANSACTION_TYPE",
+            "CONSTRUCTION_AGE_BAND")
+
+
+for (region in cross_data) {
+  print(paste(region, Sys.time()))
+  tmp <- loadRData(paste0("../Data/RData_crossSectional/crossSectional_",region,".RData") )
+  
+  
+  #N4: create new Built Form column
+  LUT_colum <- LUT_ageBand[match(tmp$CONSTRUCTION_AGE_BAND, LUT_builtForm$CONSTRUCTION_AGE_BANDfactors),"harmonisation"]
+  tmp[,n_construction_age_band := LUT_colum]
+  tmp[is.na(n_construction_age_band),n_construction_age_band := 'unknown']
+  
+  tmp <- tmp[,..cols]
+  
+}
+
+print(paste('loop time:', Sys.time() - start.time))#empty loop runs about 10 mins
+
+if(F){
+  save(tmp, file = paste0("../Outputs/WIP_crossSectional/crossSectional_baseline_",region,".RData") )
+  write.xlsx(LAD_table,
+             file = "../Data/CrossSectional_Summary.xlsx", sheetName="SHEET", append=TRUE)
+}
+
+print(paste('save time:', Sys.time() - start.time))
+```
+
 
 
 
