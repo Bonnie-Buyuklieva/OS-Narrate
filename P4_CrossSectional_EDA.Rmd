@@ -29,7 +29,105 @@ cross_data <- gsub("crossSectional_","",as.character(cross_data))
 
 EDA_cols <- read_csv("../Data/EDA_colour_scheme.csv")
 EDA_cols <- subset(EDA_cols[EDA_cols$geography_name %in%  cross_data, ])
+
+#formatting:
+lettermapping <-  data.frame( letter = c('A','B','C','D','E','F','G'), 
+                              cutoff = c(92, 81, 69, 55, 39, 21, 0))
 ```
+
+```{r}
+big_Dt <- data.table()
+for (WIP in EDA_cols$geography_name) {
+ if(WIP == "Unknown") break; 
+ region_df <- loadRData(paste0("../Outputs/WIP_crossSectional/ONSUD_crossSectional_baseline_",WIP,".RData") ) 
+ region_df$CURRENT_ENERGY_EFFICIENCY <- as.numeric(region_df$CURRENT_ENERGY_EFFICIENCY)
+ region_df$regionName
+ big_Dt <- rbindlist(list(big_Dt,region_df))
+}
+
+
+#resolve age:
+big_Dt <- big_Dt[, nn_construction_age_band := n_construction_age_band]
+big_Dt <- big_Dt[n_construction_age_band == '2012 onwards' | n_construction_age_band =='2007-2011', nn_construction_age_band := '2007 onwards']
+big_Dt <- big_Dt[n_construction_age_band == 'Not applicable', nn_construction_age_band := 'unknown']
+fctr_levels <- c("Pre-1900","1900-1929","1930-1949","1950-1966","1967-1975","1976-1982","1983-1990","1991-1995","1996-2002","2003-2006","2007 onwards","unknown")
+big_Dt <- big_Dt[,setattr(nn_construction_age_band,'levels',fctr_levels)]
+```
+
+```{r resolving building age}
+
+col <- c("TRANSACTION_TYPE","INSPECTION_DATE")
+dt2007_onward <-  big_Dt[ nn_construction_age_band == '2007 onwards', ..col]
+dt2007_onward_n <- dt2007_onward[, by = "TRANSACTION_TYPE", .(n = .N)]
+
+
+dt2007_onward <- dt2007_onward[ n_construction_age := year(dt2007_onward$INSPECTION_DATE) ]
+
+
+# Stacked + percent
+plot_dt <- big_Dt[ , by = 'nn_construction_age_band',
+                   .(n = .N)]
+plot_dt$percent <- round(plot_dt$n/sum(plot_dt$n),3)
+
+ggplot(plot_dt, aes(fill=nn_construction_age_band, x= "", y=n)) + 
+  geom_bar(position="fill", stat="identity")+ 
+  coord_flip()+theme(axis.text.y=element_blank())
+
+
+plot_dt <- plot_dt[order(plot_dt$nn_construction_age_band),]
+plot_dt <- plot_dt[c(11, seq(1,10,1),12),]
+plot_dt[,setattr(nn_construction_age_band,'levels',c(plot_dt$nn_construction_age_band))]
+
+
+ggplot(plot_dt, aes(x=nn_construction_age_band, y=n))+ 
+  geom_bar(stat='identity')+ 
+  coord_flip()
+
++theme(axis.text.y=element_blank())
+```
+
+
+```{r}
+sample <-big_Dt[sample( x= nrow(big_Dt), size = 9000, replace = F),] 
+```
+
+```{r}
+ggplot(sample, aes(x = CURRENT_ENERGY_EFFICIENCY, colour = n_construction_age_band)) +
+  geom_density(lwd = 1.2, linetype = 1)
+
+
+
++ 
+  scale_color_manual(values = EDA_cols$colour, 
+                     labels = EDA_cols$geography_name)
+```
+
+
+```{r}
+#PDP by building age
+#facetgrid: tenure x building type, region
+#facetgrid: tenure x built form, region
+
+#Scatterplot: income deprivation rank by EPCs
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 ```{r}

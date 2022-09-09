@@ -32,7 +32,7 @@ EDA_cols <- subset(EDA_cols[EDA_cols$geography_name %in%  cross_data, ])
 ```
 
 
-```{r}
+```{r baselineHistograms}
 #formatting:
 lettermapping <-  data.frame( letter = c('A','B','C','D','E','F','G'), 
                               cutoff = c(92, 81, 69, 55, 39, 21, 0))
@@ -73,80 +73,4 @@ for (WIP in EDA_cols$geography_name) {
 
 
 
-
-
-
-```{r}
-ggplot() + geom_histogram(data = region_df, 
-                              #aes_string('CURRENT_ENERGY_EFFICIENCY', colour = EDA_col),
-                              aes(CURRENT_ENERGY_EFFICIENCY , colour = n_tenure, fill = I(EDA_col), alpha=0.5 ),
-                              binwidth = 1)
-    
-    ggplot() + geom_histogram(data = region_df, 
-                              #aes_string('CURRENT_ENERGY_EFFICIENCY', colour = EDA_col),
-                              aes(CURRENT_ENERGY_EFFICIENCY , colour = n_builtForm, fill = I(EDA_col), alpha=0.5 ),
-                              binwidth = 1)
-    
-        
-    ggplot() + geom_density(data = region_df, 
-                              #aes_string('CURRENT_ENERGY_EFFICIENCY', colour = EDA_col),
-                              aes(CURRENT_ENERGY_EFFICIENCY , colour = n_builtForm, fill = I(EDA_col), alpha=0.5) )
-```
-
-
-
-
-```{r testing_sample}
-region <- cross_data[4]
-
-region_df<- loadRData( paste0("../Outputs/WIP_crossSectional/crossSectional_baseline_",region,".RData") )
-
-
-tmp_region_df <- head(region_df, 200)
-  
-
-ggplot() + geom_density(data = tail(region_df, 100), 
-                        aes(CURRENT_ENERGY_EFFICIENCY, by = n_tenure, colour = n_tenure),
-                        cut(0,100))
-
-
-
-library(scales) # For percent_format()
-
-ggplot(tail(region_df, 100), aes(CURRENT_ENERGY_EFFICIENCY, fill=n_tenure, colour=n_tenure)) +
-  geom_histogram(aes(y=2*(..density..)/sum(..density..)), breaks=seq(0,100,1), alpha=0.6, 
-                 position="identity", lwd=0.2) +
-  scale_y_continuous(labels=percent_format())
-
-
-
-```
-
-```{r density_plot}
-#set all the values that are over 100 to 101, EPCs aren't bound to 100 
-plot_obj <-  ggplot(tmp_region_df) +
-             geom_density(aes(CURRENT_ENERGY_EFFICIENCY, colour = n_tenure))
-
-```
-
-
-```{r formatting}
-#formatting:
-lettermapping <-  data.frame( letter = c('A','B','C','D','E','F','G'), 
-                              cutoff = c(92, 81, 69, 55, 39, 21, 1))
-  
-plot_obj + 
-  geom_vline( xintercept =  lettermapping$cutoff, colour = 'grey', size=1)+ 
-  annotate("text",x = lettermapping$cutoff+5, y= 0.1, label=lettermapping$letter, angle=90, size=5)+
-  theme_classic() + theme(legend.position = 'bottom', legend.box = 'horizontal')
-
-```
-
-
-
-```{r ordered_scater}
-#CEE - Usage variable   
-#environmental impact rating. 
-#potential vs current 
-```
 

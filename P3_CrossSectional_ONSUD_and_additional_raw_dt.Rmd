@@ -1,0 +1,177 @@
+---
+title: "P3_CrossSectional_EDA"
+author: "Boyana Buyuklieva"
+date: "September 7, 2022"
+output: html_document
+---
+
+
+#rename the file to be ONSUD_and_additional_raw_dt
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(tidyverse)
+library(data.table)
+library(readxl)
+library(readr)
+
+
+
+loadRData <- function(fileName){
+    #loads an RData file, and returns it
+    load(fileName)
+    get(ls()[ls() != "fileName"])
+}
+
+#get folders
+cross_data <- list.files(path = "../Data/RData_crossSectional", pattern = NULL, all.files = FALSE,
+           full.names = FALSE, recursive = FALSE,
+           ignore.case = FALSE, include.dirs = FALSE, no.. = FALSE)
+
+cross_data <- gsub(".RData","",as.character(cross_data))
+cross_data <- gsub("crossSectional_","",as.character(cross_data))
+
+
+
+EDA_cols <- read_csv("../Data/EDA_colour_scheme.csv")
+EDA_cols <- subset(EDA_cols[EDA_cols$geography_name %in%  cross_data, ])
+```
+
+
+```{r bring_in_additional_raw_data}
+#get lookUp
+LUT_ageBand <- read_excel("../Data/OS-N_EPC_v10_LUT+dictionaries.xlsx", sheet = "CONSTRUCTION_AGE_BAND",range = cell_cols("B:C"))
+
+additional_dt <- data.table()
+start.time <- Sys.time()
+
+cols <- c("LMK_KEY","POSTCODE",
+            "ENVIRONMENT_IMPACT_CURRENT","ENVIRONMENT_IMPACT_POTENTIAL",
+            "CO2_EMISS_CURR_PER_FLOOR_AREA","TOTAL_FLOOR_AREA",
+            "EXTENSION_COUNT","NUMBER_HABITABLE_ROOMS","NUMBER_HEATED_ROOMS",
+            "INSPECTION_DATE","TRANSACTION_TYPE",
+            "CONSTRUCTION_AGE_BAND")
+
+
+for (WIP in cross_data) {
+  print(paste(WIP, Sys.time()))
+  tmp <- loadRData(paste0("../Data/RData_crossSectional/crossSectional_",WIP,".RData") )
+  tmp <- tmp[,..cols]#make the df smaller here
+  
+  #N1: create new Built Form column
+  LUT_colum <- LUT_ageBand[match(tmp$CONSTRUCTION_AGE_BAND, LUT_ageBand$CONSTRUCTION_AGE_BANDfactors),"harmonisation"]
+  tmp[,n_construction_age_band := LUT_colum]
+  tmp[is.na(n_construction_age_band),n_construction_age_band := 'unknown']
+  
+  #N2: give it a region column:
+  tmp$n_region <- WIP
+
+  additional_dt <- rbindlist(list(additional_dt,tmp) )
+  
+}
+
+print(paste('loop time:', Sys.time() - start.time))# 2 mins
+setkey(additional_dt,LMK_KEY) #additional_dt saved in memory as LUT only
+```
+
+
+
+
+
+
+
+```{r assign region to unknown entries}
+unknown_region_df<- loadRData( paste0("../Outputs/WIP_crossSectional/crossSectional_baseline_","Unknown",".RData") )
+setkey(unknown_region_df, n_UPRN)
+
+#tmp <-  unknown_region_df #head(unknown_region_df, 100)
+
+for(ONSUD in EDA_cols$ONSUD){
+  #for every ONS file, check if we can assign a region based on the UPRN data
+  start.time <- Sys.time()
+  if(is.na(ONSUD))break;  
+  ONSUD_MAY_2020 <- fread(paste0("../Data/ONSUD_MAY_2020/Data/ONSUD_MAY_2020_",ONSUD,".csv"),
+                          colClasses = c("uprn" = "character"))
+  setkey(ONSUD_MAY_2020, uprn)
+
+  unknown_region_df$uprn <- unknown_region_df$n_UPRN
+  unknown_region_df[ONSUD_MAY_2020, on = 'uprn', oa11cd := i.oa11cd]
+  unknown_region_df[ONSUD_MAY_2020, on = 'uprn', lad19cd := i.lad19cd]
+  unknown_region_df[ONSUD_MAY_2020, on = 'uprn', lsoa11cd := i.lsoa11cd]
+  unknown_region_df[ONSUD_MAY_2020, on = 'uprn', rgn17cd := i.rgn17cd]
+  #print(ONSUD)
+}
+ 
+  #merge additional raw data
+  setkey(unknown_region_df,LMK_KEY)
+  unknown_region_df <- additional_dt[unknown_region_df, on = 'LMK_KEY']
+
+print(paste('loop time:', Sys.time() - start.time))# 15 mins
+
+dt_for_assignmnet <- unknown_region_df[!is.na(lsoa11cd),]
+#8 249 of 9 794 are assigned a LSOA, using UPRNs only 
+```
+
+
+
+```{r assign ONS geographies}
+unknown <- unknown_region_df[is.na(lsoa11cd),]
+unknown$region <- "Unknown"
+
+for (WIP in EDA_cols$geography_name) {
+ if(WIP == "Unknown") break; 
+ print(WIP)  
+  
+ #bring in baseline
+ region_df<- loadRData( paste0("../Outputs/WIP_crossSectional/crossSectional_baseline_",WIP,".RData") )
+ #bring in ONS LUT
+ ONSUD <- EDA_cols$ONSUD[ EDA_cols$geography_name == WIP]
+ ONSUD_MAY_2020 <- fread(paste0("../Data/ONSUD_MAY_2020/Data/ONSUD_MAY_2020_",ONSUD,".csv"),
+                          colClasses = c("uprn" = "character"))
+ 
+ #setting this as a key, as its the smaller dt
+ region_df$uprn <- region_df$n_UPRN
+ setkey(region_df, uprn)
+ setkey(ONSUD_MAY_2020, uprn)
+ 
+ region_df[ONSUD_MAY_2020, on = 'uprn', oa11cd := i.oa11cd]
+ region_df[ONSUD_MAY_2020, on = 'uprn', lad19cd := i.lad19cd]
+ region_df[ONSUD_MAY_2020, on = 'uprn', lsoa11cd := i.lsoa11cd]
+ region_df[ONSUD_MAY_2020, on = 'uprn', rgn17cd := i.rgn17cd]
+ 
+ #merge additional raw data
+ setkey(region_df,LMK_KEY)
+ region_df <- additional_dt[region_df, on = 'LMK_KEY']
+ 
+ #adds the entries that were previously not assigned to any region
+ assign <- EDA_cols$ONSUD_rgn17cd[ EDA_cols$geography_name == WIP]
+ output <- rbindlist(list(region_df[!is.na(lsoa11cd)], dt_for_assignmnet[rgn17cd == assign ,]),
+       use.names=TRUE, fill=FALSE, idcol=NULL)
+ 
+ if(F){
+  save(output, file = paste0("../Outputs/WIP_crossSectional/ONSUD_crossSectional_baseline_",WIP,".RData") ) 
+ }
+ 
+ #if there are any UPRNs that do not match the ONSUPRN, save into the unknown file
+ tmp_unknown <- region_df[is.na(lsoa11cd)]
+ tmp_unknown$region <- WIP
+   
+ unknown <- rbindlist(list(unknown, tmp_unknown),
+       use.names=TRUE, fill=FALSE, idcol=NULL)
+}
+
+if(F){
+ save(unknown, file = paste0("../Outputs/WIP_crossSectional/ONSUD_crossSectional_baseline_","Unknown",".RData") ) 
+}
+
+rm(unknown)  
+```
+
+
+
+
+
+
+
