@@ -12,6 +12,8 @@ library(tidyverse)
 library(data.table)
 library(readxl)
 library(readr)
+library(zip)
+library(archive)
 
 loadRData <- function(fileName){
     #loads an RData file, and returns it
@@ -20,12 +22,53 @@ loadRData <- function(fileName){
 }
 
 EDA_cols <- read_csv("../Data/EDA_colour_scheme.csv")
-EDA_cols <- subset(EDA_cols[EDA_cols$geography_name %in%  cross_data, ])
+hardpath <- 'C:/Users/bonni/Dropbox/_PhD/Application Documents/CASA RA/RA OS NARRATE CASA'
+
+
+ABplus_subset<- read_excel("../Data/OS_data/AddressBasePlus_Header.xlsx", 
+    sheet = "Product_Classification_Scheme")
+
 ```
 
 ```{r estimating UPRN coverage}
-#ONS gives a count of UPRNs by OA (oa11cd) in England and other OA-aggregates. 
+class_subset <- c(ABplus_subset$Concatenated_Classification)
+AB_summary_output <- setNames(data.table(matrix(nrow = 0,
+                                                ncol = length(c("ADMIN_AREA","WARD_CODE", class_subset, 'otherClass')))),
+                                                nm = c("ADMIN_AREA","WARD_CODE",class_subset, 'otherClass') )
 
 
+
+files <- list.files(path = "../Data/OS_data", pattern = NULL, all.files = FALSE,
+           full.names = FALSE, recursive = T,
+           ignore.case = FALSE, include.dirs = FALSE, no.. = FALSE)
+datastr <- 'AddressBasePlus_FULL_2022-05-17'
+zipCSVs <- files[grepl( datastr, files, fixed = TRUE)]
+
+
+for (csv in zipCSVs) {
+  #the data dump has no headers. 
+  item <- paste0(hardpath, "/Data/OS_data/plus/FULL/CSV/DVD1/data/AddressBasePlus_FULL_2022-05-17_001_csv.zip")
+  tmp <- fread(archive_extract(item), select=c(6,62,71))# worked!
+  tmp <- setNames(tmp, c('CLASS', 'ADMIN_AREA', 'WARD_CODE'))
+  tmp <- tmp[, subclass := ifelse(CLASS %in% class_subset, CLASS , 'otherClass' )]
+  
+  
+  ABfile <- tmp
+  tmp_output <- ABfile[, by = c('ADMIN_AREA', 'WARD_CODE', 'subclass'), .(n = .N) ]
+  tmp_output <- dcast( tmp_output, ADMIN_AREA + WARD_CODE ~ subclass, value.var = "n", fill = 0 )
+  
+  AB_summary_output <- rbindlist(list(AB_summary_output,tmp_output), use.names=T)
+  
+}
+
+sematic_names <- paste0(ABplus_subset$Primary_Description,':',ABplus_subset$Class_Description )
+AB_summary_output <- setNames(AB_summary_output,
+                                                nm = c("ADMIN_AREA","WARD_CODE", sematic_names,'otherClasses') )
+
+
+if(F){
+ totals <- colSums(AB_summary_output[,3:34])
+ write.csv(totals ,  '../Outputs/OS_data_coverage_summary.csv' ) 
+}
 
 ```

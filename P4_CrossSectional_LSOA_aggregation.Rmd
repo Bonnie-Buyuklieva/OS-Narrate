@@ -115,7 +115,7 @@ LSOA_imdEPC[ , n_lsoaMedian_CEE_Crel := cut(n_lsoaMedian_CEE,
 #do an quantile rank
 LSOA_imdEPC[ , DecileGrps := cut(Decile,
                             breaks = c(0, 3, 7, Inf),
-                            include.lowest= TRUE, labels=c('Decile_1-3_deprived','Decile_4-7','Decile_8-10')) ]
+                            include.lowest= TRUE, labels=c('Decile_1-3','Decile_4-7','Decile_8-10')) ]
 ```
 
 ```{r}
