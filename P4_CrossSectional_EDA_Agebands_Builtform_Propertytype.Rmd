@@ -1,0 +1,201 @@
+---
+title: "P3_CrossSectional_EDA"
+author: "Boyana Buyuklieva"
+date: "August 30, 2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(tidyverse)
+library(data.table)
+library(readr)
+
+loadRData <- function(fileName){
+    #loads an RData file, and returns it
+    load(fileName)
+    get(ls()[ls() != "fileName"])
+}
+
+#get folders
+cross_data <- list.files(path = "../Data/RData_crossSectional", pattern = NULL, all.files = FALSE,
+           full.names = FALSE, recursive = FALSE,
+           ignore.case = FALSE, include.dirs = FALSE, no.. = FALSE)
+
+cross_data <- gsub(".RData","",as.character(cross_data))
+cross_data <- gsub("crossSectional_","",as.character(cross_data))
+
+EDA_cols <- read_csv("../Data/EDA_colour_scheme.csv")
+EDA_cols <- subset(EDA_cols[EDA_cols$geography_name %in%  cross_data, ])
+
+#formatting:
+lettermapping <-  data.frame( letter = c('A','B','C','D','E','F','G'), 
+                              cutoff = c(92, 81, 69, 55, 39, 21, 0))
+```
+
+```{r}
+big_Dt <- data.table()
+for (WIP in EDA_cols$geography_name) {
+ if(WIP == "Unknown") break; 
+ region_df <- loadRData(paste0("../Outputs/WIP_crossSectional/ONSUD_crossSectional_baseline_",WIP,".RData") ) 
+ region_df$CURRENT_ENERGY_EFFICIENCY <- as.numeric(region_df$CURRENT_ENERGY_EFFICIENCY)
+ region_df$regionName
+ big_Dt <- rbindlist(list(big_Dt,region_df))
+}
+
+
+#resolve age band:
+big_Dt <- big_Dt[, nn_construction_age_band := n_construction_age_band]
+big_Dt <- big_Dt[n_construction_age_band == '2012 onwards' | n_construction_age_band =='2007-2011', nn_construction_age_band := '2007 onwards']
+big_Dt <- big_Dt[n_construction_age_band == 'Not applicable', nn_construction_age_band := 'unknown']
+fctr_levels <- c("Pre-1900","1900-1929","1930-1949","1950-1966","1967-1975","1976-1982","1983-1990","1991-1995","1996-2002","2003-2006","2007 onwards","unknown")
+big_Dt[,nn_construction_age_band := factor(nn_construction_age_band, levels = fctr_levels, ordered = T)]
+
+big_Dt[,nn_CURRENT_ENERGY_EFFICIENCY := CURRENT_ENERGY_EFFICIENCY]
+big_Dt[CURRENT_ENERGY_EFFICIENCY > 101, nn_CURRENT_ENERGY_EFFICIENCY := NA]
+```
+
+
+```{r}
+plot_dt <- big_Dt[ , by = 'nn_construction_age_band',  .(n = .N)]
+
+
+ggplot(plot_dt, aes(x=nn_construction_age_band, y=n))+ 
+  geom_bar(stat='identity')+ 
+  coord_flip()
+```
+
+
+```{r}
+
+  ggplot(big_Dt, aes(x = nn_CURRENT_ENERGY_EFFICIENCY, colour = nn_construction_age_band)) +
+  #geom_density(lwd = 1.2, linetype = 1, position="identity",geom="line", bw = 2)+  
+  stat_density(lwd = 1.2, linetype = 1, position="identity",geom="line", bw = 2)+
+  geom_vline( xintercept =  lettermapping$cutoff, colour = 'grey', size=.6)+ 
+  annotate("text",x = lettermapping$cutoff+5, y= 0.1, label=lettermapping$letter, angle=90, size=5)+
+  #theme_classic() +
+  theme_minimal()+
+  theme(legend.position = 'bottom', legend.box = 'horizontal')+
+  scale_x_continuous(name = 'Current Energy Efficiency' , breaks= lettermapping$cutoff)
+```
+
+
+```{r}
+#idea here is to see if how much potential surveyors think there is by building type. But not all changes will change the letter rating
+ big_Dt[CURRENT_ENERGY_EFFICIENCY < 101 & POTENTIAL_ENERGY_EFFICIENCY < 101,
+         n_difference_potential := POTENTIAL_ENERGY_EFFICIENCY - nn_CURRENT_ENERGY_EFFICIENCY]
+  
+  ggplot(big_Dt [n_difference_potential> 0 & n_difference_potential < 100], aes(x = n_difference_potential, colour = nn_construction_age_band)) +
+  stat_density(lwd = 1.2, linetype = 1, position="identity",geom="line", bw = 2)+
+  scale_x_continuous(name = 'Est. Potential Energy Efficiency Improvement' , breaks= seq(0,100,10))+
+  theme_minimal()+
+  theme(legend.position = 'bottom', legend.box = 'horizontal')+
+  geom_vline( xintercept =  20, colour = 'black', size=.6)+ 
+  annotate("text",x = 23, y= .066, label='Threashold for sure letter change', angle=90, size=3)
+```
+
+# Cross tabulating Property Type, Building Form and Tenure
+```{r histos_prop_type}
+plot_dt <- big_Dt[ , by = 'PROPERTY_TYPE',  .(n = .N)]
+plot_dt <- plot_dt[order(n),] # order by most common group
+plot_dt[,PROPERTY_TYPE := factor(PROPERTY_TYPE, levels = plot_dt$PROPERTY_TYPE, ordered = T)]
+#re-factor levels
+print(plot_dt$PROPERTY_TYPE)
+big_Dt[,PROPERTY_TYPE := factor(PROPERTY_TYPE, levels = plot_dt$PROPERTY_TYPE, ordered = T)]
+
+
+
+plot_dt[, percent := round(n/sum(plot_dt$n)*100,3)]
+
+ggplot(plot_dt, aes(x= PROPERTY_TYPE, y=n))+ 
+  geom_bar(stat='identity')+ 
+  coord_flip()
+```
+
+
+```{r histos_n_builtForm}
+plot_dt <- big_Dt[ , by = 'n_builtForm',  .(n = .N)]
+plot_dt <- plot_dt[order(n),] # order by most common group
+plot_dt[,n_builtForm := factor(n_builtForm, levels = plot_dt$n_builtForm, ordered = T)]
+#re-factor levels
+print(plot_dt$n_builtForm)
+big_Dt[,n_builtForm := factor(n_builtForm, levels = plot_dt$n_builtForm, ordered = T)]
+
+
+
+plot_dt[, percent := round(n/sum(plot_dt$n)*100,2)]
+
+ggplot(plot_dt, aes(x= n_builtForm, y=n))+ 
+  geom_bar(stat='identity')+ 
+  coord_flip()
+```
+
+```{r histos_n_tenure}
+plot_dt <- big_Dt[ , by = 'n_tenure',  .(n = .N)]
+plot_dt <- plot_dt[order(n),] # order by most common group
+plot_dt[,n_tenure := factor(n_tenure, levels = plot_dt$n_tenure, ordered = T)]
+#re-factor levels
+print(plot_dt$n_tenure)
+big_Dt[,n_tenure := factor(n_tenure, levels = plot_dt$n_tenure, ordered = T)]
+
+plot_dt[, percent := round(n/sum(plot_dt$n)*100,2)]
+
+ggplot(plot_dt, aes(x= n_tenure, y=n))+ 
+  geom_bar(stat='identity')+ 
+  coord_flip()
+```
+
+
+```{r}
+#drop small categories
+big_Dt_subset <- big_Dt[PROPERTY_TYPE != 'Park home' ,]
+big_Dt_subset <- big_Dt_subset[n_builtForm != 'unknown',]
+
+sample <-big_Dt_subset[sample( x= nrow(big_Dt_subset), size = 9000, replace = F),] 
+```
+
+```{r combined_plot_presentation_mode}
+#facetgrid: tenure x property type, region
+  ggplot(big_Dt_subset, aes(x = nn_CURRENT_ENERGY_EFFICIENCY, colour = nn_construction_age_band )) +
+  #geom_density(lwd = 1.2, linetype = 1, position="identity",geom="line", bw = 2)+  
+  stat_density(lwd = 1, linetype = 1, position="identity",geom="line", bw = 2)+
+  geom_vline( xintercept =  lettermapping$cutoff, colour = 'grey', size=.3)+
+  geom_vline( xintercept =  c(69,81), colour = 'black', size=.3)+
+  #annotate("text",x = lettermapping$cutoff+5, y= 0.1, label=lettermapping$letter, angle=90, size=5)+
+  theme_minimal()+
+  theme(legend.position = 'bottom', legend.box = 'horizontal')+
+  scale_x_continuous(name = 'Current Energy Efficiency' , breaks= lettermapping$cutoff)+
+  facet_grid(rows = vars(PROPERTY_TYPE),vars(n_builtForm))
+```
+
+
+```{r combined_plot_paper_mode}
+#facetgrid: tenure x property type, region
+  ggplot(big_Dt_subset, aes(x = nn_CURRENT_ENERGY_EFFICIENCY, colour = nn_construction_age_band )) +
+  #geom_density(lwd = 1.2, linetype = 1, position="identity",geom="line", bw = 2)+  
+  stat_density(lwd = 1, linetype = 1, position="identity",geom="line", bw = 2)+
+  geom_vline( xintercept =  lettermapping$cutoff, colour = 'grey', size=.3)+
+  geom_vline( xintercept =  c(69,81), colour = 'black', size=.3)+
+  #annotate("text",x = lettermapping$cutoff+5, y= 0.1, label=lettermapping$letter, angle=90, size=5)+
+  theme_minimal()+
+  theme(legend.position = 'bottom', legend.box = 'horizontal')+
+  scale_x_continuous(name = 'Current Energy Efficiency' , breaks= lettermapping$cutoff)+
+  facet_grid(rows = vars(n_builtForm),vars(PROPERTY_TYPE))
+```
+
+
+```{r}
+#subset excludes : PROPERTY_TYPE = 'Park home' , n_builtForm = 'unknown'
+#it have new variables:
+#nn_construction_age_band
+#nn_CURRENT_ENERGY_EFFICIENCY
+#n_difference_potential
+
+if(F){
+  save(big_Dt_subset, file = "../Outputs/WIP_crossSectional/ONSUD_crossSectional_subset_N16744771.RData" )
+}
+print(names(big_Dt_subset))
+```
+
+
