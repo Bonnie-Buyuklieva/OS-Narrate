@@ -1,0 +1,234 @@
+---
+title: "P3_CrossSectional_EDA"
+author: "Boyana Buyuklieva"
+date: "August 30, 2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache.lazy = FALSE)
+library(dplyr)
+library(tidyverse)
+library(data.table)
+library(readr)
+library(foreign)
+library(ggExtra)
+
+
+loadRData <- function(fileName){
+    #loads an RData file, and returns it
+    load(fileName)
+    get(ls()[ls() != "fileName"])
+}
+
+big_Dt_CSsubset_N16M7 <- loadRData("../Outputs/WIP_crossSectional/ONSUD_crossSectional_subset_N16744771.RData")
+fctr_levels <- c("C+","C","C-")
+big_Dt_CSsubset_N16M7[,n_Crel := factor(n_Crel, levels = fctr_levels, ordered = T)]
+
+#formatting:
+lettermapping <-  data.frame( letter = c('A','B','C','D','E','F','G'), 
+                              cutoff = c(92, 81, 69, 55, 39, 21, 0))
+```
+
+```{r}
+if(F){
+#there are no missing values 
+nas <- which(is.na(big_Dt_CSsubset_N16M7$CURRENT_ENERGY_EFFICIENCY))
+nas <- which(is.na(big_Dt_CSsubset_N16M7$POTENTIAL_ENERGY_EFFICIENCY))
+nas <- which(is.na(big_Dt_CSsubset_N16M7$n_potEE))
+
+nas <- which(is.na(big_Dt_CSsubset_N16M7$ENVIRONMENT_IMPACT_CURRENT))
+nas <- which(is.na(big_Dt_CSsubset_N16M7$ENVIRONMENT_IMPACT_POTENTIAL))
+nas <- which(is.na(big_Dt_CSsubset_N16M7$n_potEIC)) 
+
+#contains nas!
+nas <- which(is.na(big_Dt_CSsubset_N16M7$TOTAL_FLOOR_AREA)) 
+}
+```
+
+
+#Editing extreme values to 101
+```{r }
+#vis_subset_N16M7 <- big_Dt_CSsubset_N16M7[sample(nrow(big_Dt_CSsubset_N16M7), 2000, replace = F ), ]
+vis_subset_N16M7 <- big_Dt_CSsubset_N16M7
+
+#The SAP software could generate values over 100, however it is hard to tell which entries are real and which may be errors.
+#therefore I am not dropping these over 100, but forcing them all into one group by assigning them to 101. 
+vis_subset_N16M7[CURRENT_ENERGY_EFFICIENCY> 100 , CURRENT_ENERGY_EFFICIENCY := 101]
+vis_subset_N16M7[POTENTIAL_ENERGY_EFFICIENCY> 100 , POTENTIAL_ENERGY_EFFICIENCY := 101]
+
+vis_subset_N16M7[ENVIRONMENT_IMPACT_CURRENT> 100 , ENVIRONMENT_IMPACT_CURRENT := 101]
+vis_subset_N16M7[ENVIRONMENT_IMPACT_POTENTIAL> 100 , ENVIRONMENT_IMPACT_POTENTIAL := 101]
+
+vis_subset_N16M7[, n_potEE := POTENTIAL_ENERGY_EFFICIENCY - CURRENT_ENERGY_EFFICIENCY]
+vis_subset_N16M7[, n_potIE := ENVIRONMENT_IMPACT_POTENTIAL - ENVIRONMENT_IMPACT_CURRENT]
+```
+
+# Energy Efficiency
+```{r CEE}
+start_time <- Sys.time()
+
+counts <- sum(vis_subset_N16M7$CURRENT_ENERGY_EFFICIENCY>100)
+percents <- round(counts/length(vis_subset_N16M7$CURRENT_ENERGY_EFFICIENCY),2)
+counts <- format(counts, big.mark = ' ', trim = T)
+
+p <- ggplot(vis_subset_N16M7, aes(x=CURRENT_ENERGY_EFFICIENCY + 0.001, y = '')) +
+      geom_point() +
+      geom_boxplot()+
+      annotate(geom="label", 
+                label= paste0("Over 100:\n",counts ,'\n ~',percents,'%'),
+                x=110, y=1.2, angle = 90,
+                size = 2)+
+  scale_x_continuous(name = 'Current Energy Efficiency' , breaks= lettermapping$cutoff)+
+  labs(title = "Energy Efficiency", subtitle = paste0("Subset n=", lengths(vis_subset_N16M7)[1]))+
+  theme_minimal()
+
+
+ggMarginal(p, type="density") 
+rm(p)
+ 
+ 
+ 
+print(Sys.time() - start_time)
+```
+
+```{r PEE}
+start_time <- Sys.time()
+
+counts <- sum( vis_subset_N16M7$POTENTIAL_ENERGY_EFFICIENCY>100)
+percents <- round(counts/length(vis_subset_N16M7$POTENTIAL_ENERGY_EFFICIENCY),2)
+counts <- format(counts, big.mark = ' ', trim = T)
+
+p <- ggplot(vis_subset_N16M7, aes(x=POTENTIAL_ENERGY_EFFICIENCY, y = '')) +
+      geom_point() +
+      geom_boxplot()+
+      annotate(geom="label", 
+                label= paste0("Over 100:\n",counts ,'\n ~',percents,'%'),
+                x=110, y=1.2, angle = 90,
+                size = 2)+
+  scale_x_continuous(name = 'Potential Energy Efficiency' , breaks= lettermapping$cutoff)+
+  labs(title = "Energy Efficiency", subtitle = paste0("Subset n=", lengths(vis_subset_N16M7)[1]))+
+  theme_minimal()
+
+ggMarginal(p, type="density") 
+rm(p)
+
+print(Sys.time() - start_time)
+```
+
+
+```{r PotentialEE}
+start_time <- Sys.time()
+
+counts <- sum( vis_subset_N16M7$n_potEE>100)
+percents <- round(counts/length(vis_subset_N16M7$n_potEE),2)
+counts <- format(counts, big.mark = ' ', trim = T)
+
+labels <- round(quantile(vis_subset_N16M7$n_potEE, c(0,.25,.5,.75,1), na.rm = T),0)
+
+p <- ggplot(vis_subset_N16M7, aes(x=n_potEE, y = '')) +
+      geom_point() +
+      geom_boxplot()+
+      annotate(geom="label", 
+                label= paste0("Over 100:\n",counts ,'\n ~',percents,'%'),
+                x=110, y=1.2, angle = 90,
+                size = 2)+
+      scale_x_continuous(name = 'Energy Efficiency: Difference of Potential and Current', breaks = labels, labels = labels) +
+      labs(title = "Energy Efficiency", subtitle = paste0("Subset n=", lengths(vis_subset_N16M7)[1]))+
+      theme_minimal()
+
+ggMarginal(p, type="density") 
+rm(p)
+ 
+print(Sys.time() - start_time)#took 9 mins
+```
+
+
+# Environmental Impact
+```{r EIC}
+start_time <- Sys.time()
+
+counts <- sum(vis_subset_N16M7$ENVIRONMENT_IMPACT_CURRENT>100)
+percents <- round(counts/length(vis_subset_N16M7$ENVIRONMENT_IMPACT_CURRENT),2)
+counts <- format(counts, big.mark = ' ', trim = T)
+
+p <- ggplot(vis_subset_N16M7, aes(x=ENVIRONMENT_IMPACT_CURRENT + 0.001, y = '')) +
+      geom_point() +
+      geom_boxplot()+
+      annotate(geom="label", 
+                label= paste0("Over 100:\n",counts ,'\n ~',percents,'%'),
+                x=110, y=1.2, angle = 90,
+                size = 2)+
+  scale_x_continuous(name = 'Current Environmental Impact' , breaks= lettermapping$cutoff)+
+  labs(title = "Environmental Impact", subtitle = paste0("Subset n=", lengths(vis_subset_N16M7)[1]))+
+  theme_minimal()
+
+
+ggMarginal(p, type="density") 
+rm(p)
+ 
+ 
+ 
+print(Sys.time() - start_time)
+```
+
+```{r EIP}
+start_time <- Sys.time()
+
+counts <- sum( vis_subset_N16M7$ENVIRONMENT_IMPACT_POTENTIAL>100)
+percents <- round(counts/length(vis_subset_N16M7$ENVIRONMENT_IMPACT_POTENTIAL),2)
+counts <- format(counts, big.mark = ' ', trim = T)
+
+p <- ggplot(vis_subset_N16M7, aes(x=ENVIRONMENT_IMPACT_POTENTIAL, y = '')) +
+      geom_point() +
+      geom_boxplot()+
+      annotate(geom="label", 
+                label= paste0("Over 100:\n",counts ,'\n ~',percents,'%'),
+                x=110, y=1.2, angle = 90,
+                size = 2)+ 
+      scale_x_continuous(name = 'Potential Environmental Impact' , breaks= lettermapping$cutoff)+
+      labs(title = "Environmental Impact", subtitle = paste0("Subset n=", lengths(vis_subset_N16M7)[1]))+
+      theme_minimal()
+
+ggMarginal(p, type="density") 
+rm(p)
+
+print(Sys.time() - start_time)
+```
+
+
+```{r PotentialIE}
+start_time <- Sys.time()
+
+counts <- sum( vis_subset_N16M7$n_potIE>100)
+percents <- round(counts/length(vis_subset_N16M7$n_potIE),2)
+counts <- format(counts, big.mark = ' ', trim = T)
+
+
+labels <- round(quantile(vis_subset_N16M7$n_potIE, c(0,.25,.5,.75,1), na.rm = T),0)
+
+
+
+p <- ggplot(vis_subset_N16M7, aes(x=n_potIE, y = '')) +
+      geom_point() +
+      geom_boxplot()+
+      scale_x_continuous(name = 'Environmental Impact: Difference of Potential and Current', breaks = labels, labels = labels) +
+      annotate(geom="label", 
+                label= paste0("Over 100:\n",counts ,'\n ~',percents,'%'),
+                x=110, y=1.2, angle = 90,
+                size = 2)+ 
+      labs(title = "Environmental Impact", subtitle = paste0("Subset n=", lengths(vis_subset_N16M7)[1]))+
+      theme_minimal()
+
+ggMarginal(p, type="density")
+rm(p)
+ 
+print(Sys.time() - start_time)#took 9 mins
+```
+
+
+
+
+
+
+

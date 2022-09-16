@@ -199,3 +199,47 @@ print(names(big_Dt_subset))
 ```
 
 
+
+
+```{r}
+#Adding the 
+#big_Dt <- loadRData("../Outputs/WIP_crossSectional/ONSUD_crossSectional_subset_N16744771.RData")
+
+plot_dt <- big_Dt[ , by = c('BUILT_FORM', 'PROPERTY_TYPE'),  .(n = .N)]
+#plot_dt$percent <-  plot_dt$n/ sum(plot_dt$n)
+plot_dt$nK <- plot_dt$n/1000
+  
+ggplot(plot_dt, aes(x= BUILT_FORM, y=nK))+
+  geom_bar(stat='identity')+
+  scale_y_continuous(labels = format(seq(0,3800, by = 250), big.mark = ' '),
+                     breaks = seq(0,3800, by = 250))+
+  facet_grid(PROPERTY_TYPE ~ .) +
+  coord_flip()+
+  labs( x = '', y = 'Number of properties in 1 000s', )+
+  theme(axis.text.y=element_text(angle=30,hjust=1)) +
+  theme_minimal()
+```
+```{r}
+#to do plot tenure by building type 
+plot_dt <- big_Dt[ , by = c('BUILT_FORM', 'PROPERTY_TYPE', 'n_tenure'),  .(n = .N)]
+plot_dt[ ,nTenure := sum(n), by=n_tenure]
+plot_dt[ ,wTenurePercent := round(n/nTenure*100,0)]
+
+
+
+ggplot(plot_dt, aes(x= BUILT_FORM, y=wTenurePercent))+
+  geom_bar(stat='identity')+
+  facet_grid(PROPERTY_TYPE ~ n_tenure) +
+  coord_flip()+
+  theme_minimal()+
+  labs( x = '', y = 'Properties as % of tenure group', )+
+  labs(subtitle = paste( 'Proportions of tenure group:' ,c( round(unique(plot_dt$nTenure)/sum(plot_dt$n)*100,0))) )
+
+
+ggplot(plot_dt, aes(x= n_tenure, y=n))+ 
+  geom_bar(stat='identity')+
+  theme_classic()
+  
+
+```
+
