@@ -209,9 +209,10 @@ ggMarginal(p, type = "histogram")
   scale_x_continuous(name = 'Current Environmental Impact' , breaks= lettermapping$cutoff)+
   facet_grid(rows = vars(PROPERTY_TYPE),vars(n_builtForm))
 ```
-```
 
-```{r CEI HR}
+
+
+```{r}
 ##For heated rooms groups: slee
 #Denisty of floorspace by heated rooms, box plot 
 #Check EPCs, by tenure and deprivation, group by number of rooms
@@ -229,9 +230,136 @@ ggMarginal(p, type = "histogram")
 ```
 
 
+```{r CEI addingInTenure BF1}
+cols <- c('TOTAL_FLOOR_AREA','NUMBER_HEATED_ROOMS','NUMBER_HABITABLE_ROOMS',
+          'n_habitable_rooms_grp','n_CURRENT_ENERGY_EFFICIENCY','n_ENVIRONMENT_IMPACT_CURRENT',
+          'n_builtForm','PROPERTY_TYPE','n_tenure')
+
+big_Dt_CSsubset_N6M7 <- big_Dt_CSsubset_N6M7[!is.na(TOTAL_FLOOR_AREA),]
+vis_subset_N16M7 <- big_Dt_CSsubset_N6M7[ ,..cols]
 
 
-```{r C02 per floor area}
-#Check CO2 emissions per floor area , by tenure and deprivation 
+#facetgrid: tenure x property type, region
+  ggplot(vis_subset_N16M7[!is.na(n_habitable_rooms_grp),], aes(x = n_ENVIRONMENT_IMPACT_CURRENT, colour = n_habitable_rooms_grp)) +
+  #geom_density(lwd = 1.2, linetype = 1, position="identity",geom="line", bw = 2)+  
+  stat_density(lwd = 1, linetype = 1, position="identity",geom="line", bw = 2)+
+  geom_vline( xintercept =  lettermapping$cutoff, colour = 'grey', size=.3)+
+  geom_vline( xintercept =  c(69,81), colour = 'black', size=.3)+
+  #annotate("text",x = lettermapping$cutoff+5, y= 0.1, label=lettermapping$letter, angle=90, size=5)+
+  theme_minimal()+
+  theme(legend.position = 'bottom', legend.box = 'horizontal')+
+  scale_colour_viridis_d(option = "plasma", direction	= -1)+ 
+  scale_x_continuous(name = 'Current Environmental Impact' , breaks= lettermapping$cutoff)+
+  facet_grid(rows = vars(n_tenure))
+
+
+#facetgrid: tenure x property type, region
+  ggplot(vis_subset_N16M7[!is.na(n_habitable_rooms_grp),], aes(x = n_ENVIRONMENT_IMPACT_CURRENT, colour = n_habitable_rooms_grp)) +
+  #geom_density(lwd = 1.2, linetype = 1, position="identity",geom="line", bw = 2)+  
+  stat_density(lwd = 1, linetype = 1, position="identity",geom="line", bw = 2)+
+  geom_vline( xintercept =  lettermapping$cutoff, colour = 'grey', size=.3)+
+  geom_vline( xintercept =  c(69,81), colour = 'black', size=.3)+
+  #annotate("text",x = lettermapping$cutoff+5, y= 0.1, label=lettermapping$letter, angle=90, size=5)+
+  theme_minimal()+
+  theme(legend.position = 'bottom', legend.box = 'horizontal')+
+  scale_colour_viridis_d(option = "plasma", direction	= -1)+ 
+  scale_x_continuous(name = 'Current Environmental Impact' , breaks= lettermapping$cutoff)+
+  facet_grid(rows = vars(n_builtForm),vars(n_tenure))
+
 ```
+
+
+```{r CEE addingInTenureBF}
+cols <- c('TOTAL_FLOOR_AREA','NUMBER_HEATED_ROOMS','NUMBER_HABITABLE_ROOMS',
+          'n_habitable_rooms_grp','n_CURRENT_ENERGY_EFFICIENCY','n_ENVIRONMENT_IMPACT_CURRENT',
+          'n_builtForm','PROPERTY_TYPE','n_tenure')
+
+big_Dt_CSsubset_N6M7 <- big_Dt_CSsubset_N6M7[!is.na(TOTAL_FLOOR_AREA),]
+vis_subset_N16M7 <- big_Dt_CSsubset_N6M7[ ,..cols]
+
+#facetgrid: tenure x property type, region
+  ggplot(vis_subset_N16M7[!is.na(n_habitable_rooms_grp),], aes(x = n_CURRENT_ENERGY_EFFICIENCY, colour = n_habitable_rooms_grp)) +
+  #geom_density(lwd = 1.2, linetype = 1, position="identity",geom="line", bw = 2)+  
+  stat_density(lwd = 1, linetype = 1, position="identity",geom="line", bw = 2)+
+  geom_vline( xintercept =  lettermapping$cutoff, colour = 'grey', size=.3)+
+  geom_vline( xintercept =  c(69,81), colour = 'black', size=.3)+
+  #annotate("text",x = lettermapping$cutoff+5, y= 0.1, label=lettermapping$letter, angle=90, size=5)+
+  theme_minimal()+
+  theme(legend.position = 'bottom', legend.box = 'horizontal')+
+  scale_colour_viridis_d(option = "plasma", direction	= -1)+ 
+  scale_x_continuous(name = 'Current Environmental Efficiency' , breaks= lettermapping$cutoff)+
+  facet_grid(rows = vars(n_tenure))
+
+
+
+
+
+
+#facetgrid: tenure x property type, region
+  ggplot(vis_subset_N16M7[!is.na(n_habitable_rooms_grp),], aes(x = n_CURRENT_ENERGY_EFFICIENCY, colour = n_habitable_rooms_grp)) +
+  #geom_density(lwd = 1.2, linetype = 1, position="identity",geom="line", bw = 2)+  
+  stat_density(lwd = 1, linetype = 1, position="identity",geom="line", bw = 2)+
+  geom_vline( xintercept =  lettermapping$cutoff, colour = 'grey', size=.3)+
+  geom_vline( xintercept =  c(69,81), colour = 'black', size=.3)+
+  #annotate("text",x = lettermapping$cutoff+5, y= 0.1, label=lettermapping$letter, angle=90, size=5)+
+  theme_minimal()+
+  theme(legend.position = 'bottom', legend.box = 'horizontal')+
+  scale_colour_viridis_d(option = "plasma", direction	= -1)+ 
+  scale_x_continuous(name = 'Current Environmental Impact' , breaks= lettermapping$cutoff)+
+  facet_grid(rows = vars(n_builtForm),vars(n_tenure))
+
+```
+
+
+
+```{r CEI addingInTenure BF2}
+
+#facetgrid: tenure x property type, region
+  ggplot(vis_subset_N16M7[!is.na(n_habitable_rooms_grp),], aes(x = n_ENVIRONMENT_IMPACT_CURRENT, colour = n_habitable_rooms_grp)) +
+  #geom_density(lwd = 1.2, linetype = 1, position="identity",geom="line", bw = 2)+  
+  stat_density(lwd = 1, linetype = 1, position="identity",geom="line", bw = 2)+
+  geom_vline( xintercept =  lettermapping$cutoff, colour = 'grey', size=.3)+
+  geom_vline( xintercept =  c(69,81), colour = 'black', size=.3)+
+  #annotate("text",x = lettermapping$cutoff+5, y= 0.1, label=lettermapping$letter, angle=90, size=5)+
+  theme_minimal()+
+  theme(legend.position = 'bottom', legend.box = 'horizontal')+
+  scale_colour_viridis_d(option = "plasma", direction	= -1)+ 
+  scale_x_continuous(name = 'Current Environmental Impact' , breaks= lettermapping$cutoff)+
+  facet_grid(rows = vars(PROPERTY_TYPE),vars(n_tenure))
+
+```
+
+
+
+
+
+
+
+
+
+```{r C02 per floor area 95th }
+#Check CO2 emissions per floor area , by tenure and deprivation 
+
+subset_P95 <- big_Dt_CSsubset_N6M7[!is.na(CO2_EMISS_CURR_PER_FLOOR_AREA)& 
+CO2_EMISS_CURR_PER_FLOOR_AREA <= quantile(vis_subset_N16M7$TOTAL_FLOOR_AREA, 0.95, na.rm = T) & 
+CO2_EMISS_CURR_PER_FLOOR_AREA >= quantile(vis_subset_N16M7$TOTAL_FLOOR_AREA, 0.05, na.rm = T)
+,]
+
+ggplot(subset_P95, aes(x = CO2_EMISS_CURR_PER_FLOOR_AREA, colour = n_habitable_rooms_grp)) +
+    #geom_density(lwd = 1.2, linetype = 1, position="identity",geom="line", bw = 2)+  
+    stat_density(lwd = 1, linetype = 1, position="identity",geom="line", bw = 2)+
+    geom_vline( xintercept =  lettermapping$cutoff, colour = 'grey', size=.3)+
+    geom_vline( xintercept =  c(69,81), colour = 'black', size=.3)+
+    #annotate("text",x = lettermapping$cutoff+5, y= 0.1, label=lettermapping$letter, angle=90, size=5)+
+    theme_minimal()+
+    theme(legend.position = 'bottom', legend.box = 'horizontal')+
+    scale_colour_viridis_d(option = "plasma", direction	= -1)+ 
+    scale_x_continuous( breaks= lettermapping$cutoff)+
+    facet_grid(rows = vars(n_tenure))
+```
+
+
+
+
+
 

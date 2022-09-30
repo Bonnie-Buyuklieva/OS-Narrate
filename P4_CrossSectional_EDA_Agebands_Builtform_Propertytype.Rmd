@@ -219,6 +219,18 @@ ggplot(plot_dt, aes(x= BUILT_FORM, y=nK))+
   theme(axis.text.y=element_text(angle=30,hjust=1)) +
   theme_minimal()
 ```
+
+```{r subsetting_to_see_buildings}
+#big_Dt_CSsubset_N6M7 <- big_Dt_CSsubset_N6M7[!is.na(TOTAL_FLOOR_AREA),]
+big_Dt[, n_BFPT := paste(n_builtForm, PROPERTY_TYPE)]
+
+set.seed(100)
+a <- big_Dt[, .SD[sample(.N, 5)], by = n_BFPT]
+write_csv(a, file = '../Outputs/sample_building_property_type.csv')
+
+```
+
+
 ```{r}
 #to do plot tenure by building type 
 plot_dt <- big_Dt[ , by = c('BUILT_FORM', 'PROPERTY_TYPE', 'n_tenure'),  .(n = .N)]
