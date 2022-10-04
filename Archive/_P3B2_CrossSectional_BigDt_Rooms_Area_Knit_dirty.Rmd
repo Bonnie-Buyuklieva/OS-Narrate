@@ -51,6 +51,79 @@ lettermapping <-  data.frame( letter = c('A','B','C','D','E','F','G'),
 
 ```
 
+
+
+#from P3a_CS_Big_Dt
+```{r IMD IoDb comparison}
+#How does IMD compare to Income ID in England Only?
+##Scatter plot
+
+#ggplot(tmp[!is.na(n_bIoDRank_income), ],
+ggplot(big_Dt_CSsubset_N6M7[!is.na(n_bIoDRank_income), ],
+       aes(x=n_IMDRank, y=n_bIoDRank_income, color=n_Crel)) +
+  geom_point(alpha = 1/10) + 
+  geom_smooth(method=lm, se=FALSE, fullrange=TRUE)+
+  scale_colour_manual(values = c("C+" = "#ffa600", "C" = "#808080", "C-" = "#008cff"))
+
+
+if(F){
+model_Cplus <- lm(n_IMDRank ~ n_bIoDRank_income, 
+            data = big_Dt_CSsubset_N6M7[!is.na(n_bIoDRank_income) & n_Crel=="C+", ])
+summary(model_Cplus)
+
+model_Cminus <- lm(n_IMDRank ~ n_bIoDRank_income, 
+            data = big_Dt_CSsubset_N6M7[!is.na(n_bIoDRank_income) & n_Crel=="C-", ])
+summary(model_Cminus)
+
+model_C <- lm(n_IMDRank ~ n_bIoDRank_income, 
+            data = big_Dt_CSsubset_N6M7[!is.na(n_bIoDRank_income) & n_Crel=="C", ])
+summary(model_C) 
+}
+```
+
+```{r CEE and EIC relationship}
+#https://r-graph-gallery.com/277-marginal-histogram-for-ggplot2.html
+#ggplot(tmp,
+ggplot(big_Dt_CSsubset_N6M7[ ENVIRONMENT_IMPACT_CURRENT<101],
+       aes(x=nn_CURRENT_ENERGY_EFFICIENCY, y=ENVIRONMENT_IMPACT_CURRENT, color=n_Crel)) +
+  geom_point(alpha = 1/10) + 
+  geom_smooth(method=lm, 
+              se=FALSE, 
+              fullrange=F)+
+  scale_colour_manual(
+    values = c("C+" = "#ffa600", "C" = "#808080", "C-" = "#008cff"))
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#Knit dirty below: 
+
+
 ```{r}
 #contains nas
 nas <- which(is.na(big_Dt_CSsubset_N6M7$TOTAL_FLOOR_AREA)) 

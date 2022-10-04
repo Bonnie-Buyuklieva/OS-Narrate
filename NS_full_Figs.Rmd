@@ -1,0 +1,77 @@
+---
+title: "P6_CS_NS_full_Figs"
+author: "Bonnie Buyuklieva"
+date: "2022-09-30"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+SeeRawData = F
+```
+
+#Use with _NS_subset
+( to do: combine BigDt with NS_subset)
+
+
+```{r Fig2_Pt1}
+plot_dt <- big_Dt_CSsubset_N6M7[ , by = c('nn_builtForm', 'PROPERTY_TYPE'),  .(n = .N)]
+#plot_dt$percent <-  plot_dt$n/ sum(plot_dt$n)
+plot_dt$nK <- plot_dt$n/1000
+  
+ggplot(plot_dt, aes(x= nn_builtForm, y=nK))+
+  geom_bar(stat='identity')+
+  scale_y_continuous(labels = format(seq(0,4800, by = 250), big.mark = ' '),
+                     breaks = seq(0,4800, by = 250))+
+  facet_grid(PROPERTY_TYPE ~ .) +
+  coord_flip()+
+  labs( x = '', y = 'Number of properties in 1 000s', )+
+  theme(axis.text.y=element_text(angle=30,hjust=1)) +
+  theme_minimal()+
+  labs(title = "", subtitle = paste0("Subset n=", full_sample) )
+```
+
+
+
+
+```{r Fig2_Pt2}
+#facetgrid: tenure x property type, region
+  ggplot(big_Dt_CSsubset_N6M7, aes(x = nn_CURRENT_ENERGY_EFFICIENCY, colour = nn_construction_age_band )) +
+  #geom_density(lwd = 1.2, linetype = 1, position="identity",geom="line", bw = 2)+  
+  stat_density(lwd = 1, linetype = 1, position="identity",geom="line", bw = 2)+
+  geom_vline( xintercept =  lettermapping$cutoff, colour = 'grey', size=.3)+
+  geom_vline( xintercept =  c(69,81), colour = 'black', size=.3)+
+  #annotate("text",x = lettermapping$cutoff+5, y= 0.1, label=lettermapping$letter, angle=90, size=5)+
+  theme_minimal()+
+  theme(legend.position = 'bottom', legend.box = 'horizontal')+
+  scale_x_continuous(name = 'Current Energy Efficiency' , breaks= lettermapping$cutoff)+
+  facet_grid(rows = vars(nn_builtForm),vars(PROPERTY_TYPE))
+```
+
+
+```{r Fig3_CEE_EIC_scatter}
+full_sample = lengths(big_Dt_CSsubset_N6M7)[1]
+
+if(SeeRawData){
+# See raw data
+  raw <- ggplot(big_Dt_CSsubset_N6M7, aes(CURRENT_ENERGY_EFFICIENCY, ENVIRONMENT_IMPACT_CURRENT))+
+  geom_point()+ #geom_point(aes(color = n_Crel))
+  theme_minimal()+
+  theme(legend.position = 'bottom', legend.box = 'horizontal')
+  
+ggMarginal(raw, type="density") 
+}
+
+
+edited <- ggplot(big_Dt_CSsubset_N6M7, aes(n_CURRENT_ENERGY_EFFICIENCY, n_ENVIRONMENT_IMPACT_CURRENT))+
+ geom_point(aes(color = nn_letter_Diff_CEE_EIC, alpha = 0.05)) +
+  theme_minimal()+
+  theme(legend.position = 'bottom', legend.box = 'horizontal')+
+  scale_x_continuous( breaks= lettermapping$cutoff)+
+  scale_y_continuous( breaks= lettermapping$cutoff)+
+  scale_colour_grey()+ 
+  annotate("text",x = lettermapping$cutoff+5, y= 0.1, label=lettermapping$letter, angle=90, size=5)+
+  labs(title = "", subtitle = paste0("Subset n=", full_sample) )
+
+ggMarginal(edited, type="density")
+```

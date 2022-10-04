@@ -30,21 +30,7 @@ lettermapping <-  data.frame( letter = c('A','B','C','D','E','F','G'),
                               cutoff = c(92, 81, 69, 55, 39, 21, 0))
 ```
 
-```{r}
-if(F){
-#there are no missing values 
-nas <- which(is.na(big_Dt_CSsubset_N16M7$CURRENT_ENERGY_EFFICIENCY))
-nas <- which(is.na(big_Dt_CSsubset_N16M7$POTENTIAL_ENERGY_EFFICIENCY))
-nas <- which(is.na(big_Dt_CSsubset_N16M7$n_potEE))
 
-nas <- which(is.na(big_Dt_CSsubset_N16M7$ENVIRONMENT_IMPACT_CURRENT))
-nas <- which(is.na(big_Dt_CSsubset_N16M7$ENVIRONMENT_IMPACT_POTENTIAL))
-nas <- which(is.na(big_Dt_CSsubset_N16M7$n_potEIC)) 
-
-#contains nas!
-nas <- which(is.na(big_Dt_CSsubset_N16M7$TOTAL_FLOOR_AREA)) 
-}
-```
 
 
 #Editing extreme values to 101
