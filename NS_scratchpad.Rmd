@@ -1,0 +1,107 @@
+---
+title: "P6_CS_NS_scratchpad"
+author: "Bonnie Buyuklieva"
+date: "2022-10-04"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+SeeRawData = F
+
+
+cleanup <- list.files("C:\\Users\\bonni\\Dropbox\\_PhD\\Application Documents\\CASA RA\\RA OS NARRATE CASA\\Code" )
+
+write.csv(cleanup, "C:\\Users\\bonni\\Dropbox\\_PhD\\Application Documents\\CASA RA\\RA OS NARRATE CASA\\Code\\ReadMe.txt")
+```
+
+
+
+
+#Use with _NS_subset
+( to do: combine BigDt with NS_subset)
+```{r}
+dt <- NS_dt_N16m1[ sample(nrow(NS_dt_N16m1), 300),] 
+```
+
+
+
+
+```{r threeway_histogram}
+threeway_histogram()+theme(legend.position = "none")
+
+
+threeway_histogram(x.var = 'nn_construction_age_band')
+
+
+threeway_histogram(dt[!is.na(n_bIoDDecil_income_grp) ],
+                   x.var = 'n_bIoDDecil_income_grp')
+```
+
+
+
+
+
+
+
+
+
+```{r threeway_PD_Crel}
+
+threeway_probability_density_Crel(dt, x.var = 'n_ENVIRONMENT_IMPACT_CURRENT')+theme(legend.position = "none") + labs(title = 'my title')
+
+
+threeway_probability_density_Crel(dt,x.var = 'n_ENVIRONMENT_IMPACT_CURRENT',
+                                  facet.x.var = '.')+ labs(title = 'my title')
+
+
+threeway_probability_density_Crel(dt, x.var = 'n_ENVIRONMENT_IMPACT_CURRENT',
+                                  colour.var = 'n_bIoDDecil_income_grp',
+                                  facet.y.var = 'n_tenure',
+                                  facet.x.var = '.')+ labs(title = 'my title')
+```
+
+```{r}
+
+threeway_probability_density_Crel(dt[ !is.na(n_gIoDDecil_housing_grp) & n_gIoDDecil_housing_grp != 'NA',],
+                                  x.var = 'CURRENT_ENERGY_EFFICIENCY',
+                                  colour.var = 'nn_letter_Diff_CEE_EIC',
+                                  facet.y.var = 'nn_letter_Diff_CEE_EIC',
+                                  facet.x.var = 'n_gIoDDecil_housing_grp')+ labs(title = 'my title')
+
+
+```
+
+
+
+```{r IMD_threeway_PD_Crel}
+
+subset <- dt[ !is.na(n_bIoDDecil_income_grp) & n_bIoDDecil_income_grp != 'NA',]
+  
+threeway_probability_density_Crel(dt[ !is.na(n_bIoDDecil_income_grp) & n_bIoDDecil_income_grp != 'NA',],
+                                  x.var = 'CURRENT_ENERGY_EFFICIENCY',
+                                  colour.var = 'n_tenure',
+                                  facet.y.var = 'nn_letter_Diff_CEE_EIC',
+                                  facet.x.var = 'n_bIoDDecil_income_grp')+ labs(title = 'my title')+                                    #scale_colour_grey(start=0.8, end=0.2)+
+  scale_colour_brewer(palette = "Set1", direction = -1)+
+  scale_x_continuous(name = 'Current Energy Efficiency' , breaks= lettermapping$cutoff)+labs(title = "Deprivation-b", 
+       caption ='Author: Bonnie Buyuklieva, @Bonnie_0000 \n Project: OS Narrate, UCL 2022-23 \nCentre for Advanced Spatial Analysis ')
+
+
+```
+
+
+```{r threeway_probability_density}
+#no crel carpet:
+threeway_probability_density()
+```
+
+
+
+
+
+
+
+
+
+

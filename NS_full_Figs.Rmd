@@ -7,18 +7,34 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-SeeRawData = F
+SeeRawData = 
+  
+options(scipen=10000)
 ```
 
 #Use with _NS_subset
 ( to do: combine BigDt with NS_subset)
 
+```{r makingdata_smaller}
+cols <- c('TOTAL_FLOOR_AREA','NUMBER_HEATED_ROOMS','NUMBER_HABITABLE_ROOMS',
+          'n_habitable_rooms_grp','n_CURRENT_ENERGY_EFFICIENCY','n_ENVIRONMENT_IMPACT_CURRENT',
+          'n_builtForm','PROPERTY_TYPE','n_tenure','n_bIoDDecil_income_grp', 'n_Crel','CO2_EMISS_CURR_PER_FLOOR_AREA')
 
-```{r Fig2_Pt1}
-plot_dt <- big_Dt_CSsubset_N6M7[ , by = c('nn_builtForm', 'PROPERTY_TYPE'),  .(n = .N)]
-#plot_dt$percent <-  plot_dt$n/ sum(plot_dt$n)
+full_sample = lengths(NS_dt_N16m1)[1]
+```
+
+
+
+The figure below shows how property types are spread across building types. Terrace houses are most common, as are terrace flats. Maisonettes are flats across two floors. 
+
+*Explain  how a detached maisonette is different from a house.*
+*Explain  a semi-detached bungalow.*
+```{r Fig2_Pt1_historgram}
+plot_dt <- NS_dt_N16m1[ , by = c('nn_builtForm', 'PROPERTY_TYPE'),  .(n = .N)]
+plot_dt$percent <-  plot_dt$n/ sum(plot_dt$n)
 plot_dt$nK <- plot_dt$n/1000
-  
+
+
 ggplot(plot_dt, aes(x= nn_builtForm, y=nK))+
   geom_bar(stat='identity')+
   scale_y_continuous(labels = format(seq(0,4800, by = 250), big.mark = ' '),
@@ -28,50 +44,307 @@ ggplot(plot_dt, aes(x= nn_builtForm, y=nK))+
   labs( x = '', y = 'Number of properties in 1 000s', )+
   theme(axis.text.y=element_text(angle=30,hjust=1)) +
   theme_minimal()+
-  labs(title = "", subtitle = paste0("Subset n=", full_sample) )
+  labs(subtitle = paste0("n=", format(full_sample, big.mark = ' ') ) )+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, size=7) )+
+  labs(title = "Cross-sectional EPC Morphology", 
+       caption ='Author: Bonnie Buyuklieva, @Bonnie_0000 \n Project: OS Narrate, UCL 2022-23 \nCentre for Advanced Spatial Analysis ')
+
+
+if(F){
+  #causes issues with x axis ticks
+ threeway_histogram(dat = NS_dt_N16m1, 
+                   x.var = 'nn_builtForm',
+                   facet.y.var = 'PROPERTY_TYPE',
+                   facet.x.var = '.')+
+  #Additional Params here:
+                   coord_flip()+                 
+                   geom_bar(color = "grey", fill = "grey")+
+                   theme(legend.position = "none")+
+  theme(axis.text.x = element_text(angle = -90, hjust = 1, size=7) ) 
+}
+
+ggsave("../Outputs/plots/20221006_Cross-sectional_EPC_Morphology.png", width = 21, height = 21, units = "cm" )
 ```
 
 
+```{r Fig2_Pt1_historgram_by_age_band}
+#for reference only
+plot_dt <- NS_dt_N16m1[ , by = c('nn_builtForm', 'PROPERTY_TYPE','nn_construction_age_band'),  .(n = .N)]
 
+  
+ggplot(NS_dt_N16m1, aes(x= nn_construction_age_band, y=stat(count), fill = nn_construction_age_band))+
+  geom_bar()+
+  #scale_y_continuous(labels = format(seq(12,12000, by = 1000), big.mark = ' '),
+  #                  breaks = seq(1200,1200000, by = 10000))+
+  facet_grid(nn_builtForm ~ PROPERTY_TYPE, scale = "free_y") +
+  #coord_flip()+
+  labs( x = 'Building Age', y = 'Number of properties in 100s' )+
+  theme_minimal()+
+  theme(axis.text.y = element_text(hjust = 1, size=6),
+        axis.text.x = element_text(angle = 90, hjust = 1, size=7),
+        legend.position="none")+
+  labs(subtitle = paste0("n=", format(full_sample, big.mark = ' ') ) ) +
+  labs(title = "Building Characteristics of Cross-sectional EPC Records", caption ='Author: Bonnie Buyuklieva, @Bonnie_0000 \n Project: OS Narrate, UCL 2022-23 \nCentre for Advanced Spatial Analysis ')
+
+ggsave("../Outputs/plots/20221006_Building_Characteristics_of_Cross-sectional_EPC_Records_Histo.png", width = 21, height = 21, units = "cm" )
+
+
+if(F){
+  threeway_histogram()+theme(legend.position = "none")
+}
+```
 
 ```{r Fig2_Pt2}
-#facetgrid: tenure x property type, region
-  ggplot(big_Dt_CSsubset_N6M7, aes(x = nn_CURRENT_ENERGY_EFFICIENCY, colour = nn_construction_age_band )) +
-  #geom_density(lwd = 1.2, linetype = 1, position="identity",geom="line", bw = 2)+  
-  stat_density(lwd = 1, linetype = 1, position="identity",geom="line", bw = 2)+
-  geom_vline( xintercept =  lettermapping$cutoff, colour = 'grey', size=.3)+
-  geom_vline( xintercept =  c(69,81), colour = 'black', size=.3)+
-  #annotate("text",x = lettermapping$cutoff+5, y= 0.1, label=lettermapping$letter, angle=90, size=5)+
-  theme_minimal()+
-  theme(legend.position = 'bottom', legend.box = 'horizontal')+
+threeway_probability_density_Crel(NS_dt_N16m1, x.var = 'CURRENT_ENERGY_EFFICIENCY',
+                                   facet.y.var = '.',
+                                   facet.x.var = '.',)+
+  labs(title = "Current Energy Efficiency by Building Age Band", 
+       caption ='Author: Bonnie Buyuklieva, @Bonnie_0000 \n Project: OS Narrate, UCL 2022-23 \nCentre for Advanced Spatial Analysis ')
+
+ggsave("../Outputs/plots/20221006_Building_Age_PD.png", width = 27, height = 21, units = "cm" )
+
+
+
+
+
+
+start.time <- Sys.time()
+threeway_probability_density_Crel(NS_dt_N16m1, x.var = 'CURRENT_ENERGY_EFFICIENCY',
+                                   facet.y.var = 'nn_builtForm',
+                                   facet.x.var = 'PROPERTY_TYPE',)+
+  theme(legend.title=element_blank())+
   scale_x_continuous(name = 'Current Energy Efficiency' , breaks= lettermapping$cutoff)+
-  facet_grid(rows = vars(nn_builtForm),vars(PROPERTY_TYPE))
+  labs(title = "Current Energy Efficiency by Building Characteristic", 
+       caption ='Author: Bonnie Buyuklieva, @Bonnie_0000 \n Project: OS Narrate, UCL 2022-23 \nCentre for Advanced Spatial Analysis ')
+
+ggsave("../Outputs/plots/20221006_Building_Characteristics_of_Cross-sectional_EPC_Records_PD.png", width = 21, height = 21, units = "cm" )
+Sys.time() - start.time
 ```
+
+
+
 
 
 ```{r Fig3_CEE_EIC_scatter}
-full_sample = lengths(big_Dt_CSsubset_N6M7)[1]
-
-if(SeeRawData){
-# See raw data
-  raw <- ggplot(big_Dt_CSsubset_N6M7, aes(CURRENT_ENERGY_EFFICIENCY, ENVIRONMENT_IMPACT_CURRENT))+
-  geom_point()+ #geom_point(aes(color = n_Crel))
-  theme_minimal()+
-  theme(legend.position = 'bottom', legend.box = 'horizontal')
-  
-ggMarginal(raw, type="density") 
-}
-
-
-edited <- ggplot(big_Dt_CSsubset_N6M7, aes(n_CURRENT_ENERGY_EFFICIENCY, n_ENVIRONMENT_IMPACT_CURRENT))+
- geom_point(aes(color = nn_letter_Diff_CEE_EIC, alpha = 0.05)) +
+start.time <- Sys.time()
+edited <- ggplot(NS_dt_N16m1, aes(CURRENT_ENERGY_EFFICIENCY, ENVIRONMENT_IMPACT_CURRENT))+
+#edited <- ggplot(dt, aes(CURRENT_ENERGY_EFFICIENCY, ENVIRONMENT_IMPACT_CURRENT))+
+ geom_point(aes(color = nn_letter_Diff_CEE_EIC, 
+                alpha = 0.01,
+                stroke = 0)) +
   theme_minimal()+
   theme(legend.position = 'bottom', legend.box = 'horizontal')+
   scale_x_continuous( breaks= lettermapping$cutoff)+
   scale_y_continuous( breaks= lettermapping$cutoff)+
-  scale_colour_grey()+ 
   annotate("text",x = lettermapping$cutoff+5, y= 0.1, label=lettermapping$letter, angle=90, size=5)+
+  annotate("text",y = lettermapping$cutoff+5, x= 0.1, label=lettermapping$letter, angle=90, size=5)+
+  labs(title = "", subtitle = paste0("Subset n=", full_sample) )+
+  labs(title = "Energy Efficiency vs Environmental Impact ", 
+       caption ='Author: Bonnie Buyuklieva, @Bonnie_0000 \n Project: OS Narrate, UCL 2022-23 \nCentre for Advanced Spatial Analysis ')+
+  labs(x = 'Current Energy Efficiency \n (higher - lower running cost)')+
+  labs(y = 'Current Environmental Impact \n (higher - lower C02 emissions)')+
+  theme(legend.position="none")+
+  scale_fill_grey(start=0.2, end=0.8)
+
+p <- ggMarginal(edited, type="density")
+print(p)
+ggsave("../Outputs/plots/20221006_CEE_EIC_scatter.png", width = 21, height = 21, units = "cm" )
+
+edited
+ggsave("../Outputs/plots/20221006_CEE_EIC_scatter_noPD.png", width = 21, height = 21, units = "cm" )
+
+Sys.time() - start.time #15.47631
+```
+
+```{r}
+threeway_histogram(NS_dt_N16m1,
+                   #facet.y.var = 'PROPERTY_TYPE',
+                   #facet.x.var = 'nn_builtForm', 
+                   facet.y.var = '.',
+                   facet.x.var = '.', 
+                   x.var = 'nn_letter_Diff_CEE_EIC',)+
+                   coord_flip()+
+                   theme(legend.title=element_blank())+
+  labs(title = "Discordances between Energy Efficiency & Environmental Impact ", 
+       caption ='Author: Bonnie Buyuklieva, @Bonnie_0000 \n Project: OS Narrate, UCL 2022-23 \nCentre for Advanced Spatial Analysis ')
+
+ggsave("../Outputs/plots/20221006_CEE_EIC_histos.png", width = 21, height = 10, units = "cm" )
+
+
+threeway_histogram(NS_dt_N16m1,
+                   facet.y.var = 'nn_builtForm',
+                   facet.x.var = 'PROPERTY_TYPE', 
+                   x.var = 'nn_letter_Diff_CEE_EIC',)+
+                   theme(legend.position="none")+
+  labs(title = "Discordances between Energy Efficiency & Environmental Impact ", 
+       caption ='Author: Bonnie Buyuklieva, @Bonnie_0000 \n Project: OS Narrate, UCL 2022-23 \nCentre for Advanced Spatial Analysis ')+
+       labs( x = '', y = '' )
+
+ggsave("../Outputs/plots/20221006_CEE_EIC_histos.png", width = 27, height = 21, units = "cm" )
+```
+
+
+
+```{r letterDiffHisto}
+plot_dt <- NS_dt_N16m1[ , by = c('nn_builtForm', 'PROPERTY_TYPE','nn_letter_Diff_CEE_EIC'),  .(n = .N)]
+plot_dt$percent <-  plot_dt$n/ sum(plot_dt$n)
+plot_dt$nK <- plot_dt$n/1000
+
+
+
+
+
+
+
+
+```
+
+
+
+
+
+
+```{r deprivation_CEixCrel}
+threeway_probability_density_Crel(NS_dt_N16m1[!is.na(n_bIoDDecil_income_grp)], x.var = 'ENVIRONMENT_IMPACT_CURRENT',
+                                   facet.y.var = 'n_Crel',
+                                   facet.x.var = 'n_bIoDDecil_income_grp',
+                                   colour.var = 'n_tenure')+
+                                   scale_colour_brewer(palette = "Set1", direction = -1)+
+  scale_x_continuous(name = 'Current Environmental Impact Score' , breaks= lettermapping$cutoff)+
+  theme(legend.title=element_blank())+
+  labs(title = "Deprivation-b: Income Deprivation", 
+       caption ='Author: Bonnie Buyuklieva, @Bonnie_0000 \n Project: OS Narrate, UCL 2022-23 \nCentre for Advanced Spatial Analysis ')
+
+
+ggsave("../Outputs/plots/20221006_Deprivation-b_Crel_PD_3x3.png", width = 27, height = 21, units = "cm" )
+
+threeway_probability_density_Crel(NS_dt_N16m1[!is.na(n_bIoDDecil_income_grp)][n_bIoDDecil_income_grp != 'AverageIncome_4-7'][n_Crel != 'C'], x.var = 'ENVIRONMENT_IMPACT_CURRENT',
+                                   facet.y.var = 'n_Crel',
+                                   facet.x.var = 'n_bIoDDecil_income_grp',
+                                   colour.var = 'n_tenure')+
+                                   scale_colour_brewer(palette = "Set1", direction = -1)+
+  scale_x_continuous(name = 'Current Environmental Impact Score' , breaks= lettermapping$cutoff)+
+  theme(legend.title=element_blank())+
+  labs(title = "Deprivation-b: Income Deprivation", 
+       caption ='Author: Bonnie Buyuklieva, @Bonnie_0000 \n Project: OS Narrate, UCL 2022-23 \nCentre for Advanced Spatial Analysis ')
+
+
+ggsave("../Outputs/plots/20221006_Deprivation-b_Crel_PD_2x2.png", width= 27, height = 21, units = "cm" )
+
+
+
+
+
+threeway_probability_density_Crel(NS_dt_N16m1[!is.na(n_gIoDDecil_housing_grp)], x.var = 'ENVIRONMENT_IMPACT_CURRENT',
+                                   facet.y.var = 'n_Crel',
+                                   facet.x.var = 'n_gIoDDecil_housing_grp',
+                                   colour.var = 'n_tenure')+
+                                   scale_colour_brewer(palette = "Set1", direction = -1)+
+  scale_x_continuous(name = 'Current Environmental Impact Score' , breaks= lettermapping$cutoff)+
+  theme(legend.title=element_blank())+
+  labs(title = "Deprivation-g: Barriers to Housing and Services", 
+       caption ='Author: Bonnie Buyuklieva, @Bonnie_0000 \n Project: OS Narrate, UCL 2022-23 \nCentre for Advanced Spatial Analysis ')
+ggsave("../Outputs/plots/20221006_Deprivation-g_Crel_PD_3x3.png", width= 27, height = 21, units = "cm" )
+
+
+threeway_probability_density_Crel(NS_dt_N16m1[!is.na(n_gIoDDecil_housing_grp)][n_gIoDDecil_housing_grp != 'AverageAccess_4-7'][n_Crel != 'C'], 
+                                   x.var = 'ENVIRONMENT_IMPACT_CURRENT',
+                                   facet.y.var = 'n_Crel',
+                                   facet.x.var = 'n_gIoDDecil_housing_grp',
+                                   colour.var = 'n_tenure')+
+                                   scale_colour_brewer(palette = "Set1", direction = -1)+
+  scale_x_continuous(name = 'Current Environmental Impact Score' , breaks= lettermapping$cutoff)+
+  theme(legend.title=element_blank())+
+  labs(title = "Deprivation-g: Barriers to Housing and Services", 
+       caption ='Author: Bonnie Buyuklieva, @Bonnie_0000 \n Project: OS Narrate, UCL 2022-23 \nCentre for Advanced Spatial Analysis ')
+
+ggsave("../Outputs/plots/20221006_Deprivation-g_Crel_PD_2x2.png", width= 27, height = 21, units = "cm" )
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#Bonus:
+
+```{r deprivation_CEExLetter Diff}
+threeway_probability_density_Crel(NS_dt_N16m1[ !is.na(n_bIoDDecil_income_grp) & n_bIoDDecil_income_grp != 'NA',],
+                                  x.var = 'CURRENT_ENERGY_EFFICIENCY',
+                                  colour.var = 'n_tenure',
+                                  facet.y.var = 'nn_letter_Diff_CEE_EIC',
+                                  facet.x.var = 'n_bIoDDecil_income_grp')+
+                                  scale_colour_brewer(palette = "Set1", direction = -1)+
+  scale_x_continuous(name = 'Current Energy Efficiency' , breaks= lettermapping$cutoff)+
+  theme(legend.title=element_blank())+
+  labs(title = "Deprivation-b: Income Deprivation", 
+       caption ='Author: Bonnie Buyuklieva, @Bonnie_0000 \n Project: OS Narrate, UCL 2022-23 \nCentre for Advanced Spatial Analysis ')
+
+ggsave("../Outputs/plots/20221006_Deprivation-b_PD.png", width = 27, height = 21, units = "cm" )
+
+
+threeway_probability_density_Crel(NS_dt_N16m1[ !is.na(n_gIoDDecil_housing_grp) & n_gIoDDecil_housing_grp != 'NA',],
+                                  x.var = 'CURRENT_ENERGY_EFFICIENCY',
+                                  colour.var = 'n_tenure',
+                                  facet.y.var = 'nn_letter_Diff_CEE_EIC',
+                                  facet.x.var = 'n_gIoDDecil_housing_grp')+
+                                  scale_colour_brewer(palette = "Set1", direction = -1)+
+  scale_x_continuous(name = 'Current Energy Efficiency' , breaks= lettermapping$cutoff)+
+  theme(legend.title=element_blank())+
+  labs(title = "Deprivation-g: Barriers to Housing and Services", 
+       caption ='Author: Bonnie Buyuklieva, @Bonnie_0000 \n Project: OS Narrate, UCL 2022-23 \nCentre for Advanced Spatial Analysis ')
+
+ggsave("../Outputs/plots/20221006_Deprivation-g_PD.png", width = 27, height = 21, units = "cm" )
+```
+
+
+```{r habitable_to_heated_rooms}
+subset_n <- lengths(NS_dt_N16m1[!is.na(NUMBER_HEATED_ROOMS) & !is.na(NUMBER_HABITABLE_ROOMS),])[1]
+subset_n <- format(subset_n, big.mark = ' ', trim = T)
+
+
+p <- ggplot(NS_dt_N16m1[!is.na(NUMBER_HEATED_ROOMS) & !is.na(NUMBER_HABITABLE_ROOMS),],
+            aes(NUMBER_HEATED_ROOMS, NUMBER_HABITABLE_ROOMS, fill = nn_letter_Diff_CEE_EIC)) + 
+ geom_point(aes(color = nn_letter_Diff_CEE_EIC, alpha = 0.05))+
+  labs(caption = paste('N (non-empty) = ', subset_n)) + 
+  theme_minimal()+ theme(legend.position = 'bottom')+
   labs(title = "", subtitle = paste0("Subset n=", full_sample) )
 
-ggMarginal(edited, type="density")
+ggMarginal(p, type = "histogram")  
 ```
+
+
+```{r heatedrooms}
+##For heated rooms groups: slee
+#Denisty of floorspace by heated rooms, box plot 
+#Check EPCs, by tenure and deprivation, group by number of rooms
+
+  ggplot(NS_dt_N16m1[!is.na(n_heated_rooms_grp),], aes(x = n_ENVIRONMENT_IMPACT_CURRENT, colour = n_heated_rooms_grp)) +
+  #geom_density(lwd = 1.2, linetype = 1, position="identity",geom="line", bw = 2)+  
+  stat_density(lwd = 1.2, linetype = 1, position="identity",geom="line", bw = 2)+
+  geom_vline( xintercept =  lettermapping$cutoff, colour = 'grey', size=.6)+ 
+  annotate("text",x = lettermapping$cutoff+5, y= 0.1, label=lettermapping$letter, angle=90, size=5)+
+  #theme_classic() +
+  theme_minimal()+
+  scale_colour_viridis_d(option = "plasma", direction	= -1)+ 
+  theme(legend.position = 'bottom', legend.box = 'horizontal')+
+  scale_x_continuous(name = 'Current Environmental Impact' , breaks= lettermapping$cutoff)+
+  labs(title = "", subtitle = paste0("Subset n=", full_sample) )
+```
+

@@ -1,0 +1,82 @@
+---
+title: "P3_CrossSectional_EDA"
+author: "Boyana Buyuklieva"
+date: "August 30, 2022"
+output: html_document
+---
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE, cache.lazy = FALSE)
+library(dplyr)
+library(tidyverse)
+library(data.table)
+library(readr)
+library(foreign)
+library(ggExtra)
+library(gridExtra)
+
+
+loadRData <- function(fileName){
+    #loads an RData file, and returns it
+    load(fileName)
+    get(ls()[ls() != "fileName"])
+}
+
+source("../Outputs/Thesis_custom_scripts.R", local = knitr::knit_global())
+
+#formatting:
+lettermapping <-  data.frame( letter = c('A','B','C','D','E','F','G'), 
+                              cutoff = c(92, 81, 69, 55, 39, 21, 0))
+#NS_dt_N16m4 <- loadRData("../Outputs/WIP_crossSectional/NS_subset_N16m440270.RData")
+NS_dt_N16m1 <- loadRData("../Outputs/WIP_crossSectional/NS_subset_N16m111443.RData")
+
+#move to the subsetting script
+NS_dt_N16m1 <- NS_dt_N16m1[ !nn_construction_age_band == 'unknown']#14472351
+
+NS_dt_N16m1 <- NS_dt_N16m1[,nn_builtForm:= factor(nn_builtForm, levels = c('Terrace','Semi-Detached','Detached'), ordered = T), ]
+```
+
+threeway_probability_density:
+# different x axis labels:
+#x.var = 'CO2_EMISS_CURR_PER_FLOOR_AREA', 'TOTAL_FLOOR_AREA'
+
+
+
+
+
+
+```{r tallys_by_group}
+#tally by groups 
+check1 <- big_Dt_CSsubset_N6M7[ , by = c('nn_construction_age_band','nn_builtForm', 'PROPERTY_TYPE'),  .(n = .N)]
+check1 <- big_Dt_CSsubset_N6M7[ , by = c('nn_construction_age_band'),  .(n = .N)]
+
+```
+
+
+```{r subsetting_to_see_buildings}
+
+#NS_dt_N16m1 <- loadRData("../Outputs/WIP_crossSectional/NS_subset_N16m440270_with_OS.RData")
+#big_Dt_CSsubset_N6M7 <- big_Dt_CSsubset_N6M7[!is.na(TOTAL_FLOOR_AREA),]
+big_Dt_CSsubset_N6M7[, n_BFPT := paste(n_builtForm, PROPERTY_TYPE)]
+
+set.seed(100)
+a <- big_Dt_CSsubset_N6M7[, .SD[sample(.N, 10)], by = n_BFPT]
+write_csv(a, file = '../Outputs/sample_building_property_type.csv')
+
+
+set.seed(100)
+big_Dt_CSsubset_N6M7[, n_rBFPT := paste(BUILT_FORM, PROPERTY_TYPE)]
+a <- big_Dt_CSsubset_N6M7[, .SD[sample(.N, 5)], by = n_rBFPT]
+write_csv(a, file = '../Outputs/sample_raw_building_property_type.csv')
+
+
+set.seed(100)
+a <- big_Dt_CSsubset_N6M7[, .SD[sample(.N, 5)], by = n_rBFPT]
+write_csv(a, file = '../Outputs/Age_unknown.csv')
+```
+
+
+
+
+
+

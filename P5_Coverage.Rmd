@@ -28,9 +28,10 @@ hardpath <- 'C:/Users/bonni/Dropbox/_PhD/Application Documents/CASA RA/RA OS NAR
 ABplus_subset<- read_excel("../Data/OS_data/AddressBasePlus_Header.xlsx", 
     sheet = "Product_Classification_Scheme")
 
-```
+ABplus<- read_excel("../Data/OS_data/AddressBasePlus_Header.xlsx", 
+    sheet = "samples")
+ABplus_header <- ABplus$OS_AddressBase
 
-```{r estimating UPRN coverage}
 class_subset <- c(ABplus_subset$Concatenated_Classification)
 AB_summary_output <- setNames(data.table(matrix(nrow = 0,
                                                 ncol = length(c("ADMIN_AREA","WARD_CODE", class_subset, 'otherClass')))),
@@ -38,37 +39,166 @@ AB_summary_output <- setNames(data.table(matrix(nrow = 0,
 
 
 
-files <- list.files(path = "../Data/OS_data", pattern = NULL, all.files = FALSE,
+files <- list.files(path = "../Data/OS_data/e90_ab_plus_csv_gb", pattern = NULL, all.files = FALSE,
            full.names = FALSE, recursive = T,
            ignore.case = FALSE, include.dirs = FALSE, no.. = FALSE)
-datastr <- 'AddressBasePlus_FULL_2022-05-17'
-zipCSVs <- files[grepl( datastr, files, fixed = TRUE)]
 
+#gets all the zip csvs
+datastr <- 'AddressBasePlus_FULL_2022-01-10'
+zipCSVs <- files[grepl( datastr, files, fixed = TRUE)]
+```
+
+
+
+```{r load_all_OS}
+#columns to pickUp
+ABplus_mergeCols<- ABplus$OS_AddressBase[ !is.na(ABplus$`NS_useful?`)]
+select_rows <- which(ABplus$OS_AddressBase %in% ABplus_mergeCols)
+
+start.time <- Sys.time()
+for (csv in zipCSVs) {
+  print(csv)
+  item <- paste0(hardpath, "/Data/OS_data/e90_ab_plus_csv_gb/",csv) 
+  OSdt <- fread(archive_extract(item) , 
+                select=c(select_rows))
+  
+  #the data dump has no headers.
+  OSdt <- setNames(OSdt, c(ABplus_mergeCols) )
+  OSdt[,UPRN:=as.character(UPRN),]
+  
+  
+  
+  if(csv == zipCSVs[1] ){
+    OS_dt_combi <- OSdt
+  }else{
+    OS_dt_combi <- rbindlist(list(OS_dt_combi,OSdt), use.names=TRUE, fill=TRUE)
+  }
+  
+  
+  #creates  "i.Y_COORDINATE"  column
+  #NS_dt_N16m4 <- NS_dt_N16m4[OSdt, on = .(UPRN), ]
+  #NS_dt_N16m4 <- OSdt[NS_dt_N16m4, on = .(UPRN), ]
+}
+
+setkey(OS_dt_combi, UPRN)
+Sys.time() - start.time
+```
+
+
+
+
+```{r merging_to_NS}
+start.time <- Sys.time()
+#NS_dt_N16m4 <- loadRData("../Outputs/WIP_crossSectional/NS_subset_N16m440270.RData") # takes ages
+Sys.time() - start.time
+
+NS_dt_cols <- read_csv("../Data/NS_dt_cols.csv")
+cols <- NS_dt_cols$cols[!is.na(NS_dt_cols$link_to_OS)]
+NS_dt_N16m4 <- NS_dt_N16m4[,..cols,]
+rm(NS_dt_cols,cols)
+
+#note this is made only for merging!
+NS_dt_N16m4[, UPRN := n_UPRN]
+
+setkey(NS_dt_N16m4, UPRN)
+
+NS_dt_N16m4 <- NS_dt_N16m4[OS_dt_combi, on = .(UPRN), ]
+
+NS_dt_N16m4a <- NS_dt_N16m4[!is.na(NS_dt_N16m4$LMK_KEY)]
+#save( NS_dt_N16m4a , file = "../Outputs/WIP_crossSectional/NS_subset_N16m440270_with_OS.RData")
+Sys.time() - start.time
+```
+
+
+
+```{r get_ONSgeographies}
+#get folders
+cross_data <- list.files(path = "../Data/RData_crossSectional", pattern = NULL, all.files = FALSE,
+           full.names = FALSE, recursive = FALSE,
+           ignore.case = FALSE, include.dirs = FALSE, no.. = FALSE)
+
+cross_data <- gsub(".RData","",as.character(cross_data))
+cross_data <- gsub("crossSectional_","",as.character(cross_data))
+
+EDA_cols <- read_csv("../Data/EDA_colour_scheme.csv")
+EDA_cols <- subset(EDA_cols[EDA_cols$geography_name %in%  cross_data, ])
+
+start.time <- Sys.time()
+for (WIP in EDA_cols$geography_name) {
+  if(WIP == "Unknown") break; 
+  print(WIP)  
+  
+  #bring in ONS LUT
+  ONSUD <- EDA_cols$ONSUD[ EDA_cols$geography_name == WIP]
+  ONSUD_MAY_2020 <- fread(paste0("../Data/ONSUD_MAY_2020/Data/ONSUD_MAY_2020_",ONSUD,".csv"),
+                           colClasses = c("uprn" = "character"))
+  
+  if(WIP == EDA_cols$geography_name[1] ){
+    ONS_dt_combi <- ONSUD_MAY_2020
+  }else{
+    ONS_dt_combi <- rbindlist(list(ONS_dt_combi,ONSUD_MAY_2020), use.names=TRUE, fill=TRUE)
+  }
+  rm(ONSUD_MAY_2020)
+}
+
+ONS_dt_combi[ ,UPRN := uprn, ]
+setkey(ONS_dt_combi, UPRN)
+
+OS_ONS_dt_combi <- ONS_dt_combi[OS_dt_combi, on = .(UPRN), ]
+Sys.time() - start.time
+
+
+
+save( OS_ONS_dt_combi , file = "../Outputs/WIP_crossSectional/OS_ONS_dt_combi_37M385807.RData")
+```
+
+
+
+
+
+
+```{r estimating_UPRN_coverage}
+
+class_subset <- c(ABplus_subset$Concatenated_Classification)
+AB_summary_output <- setNames(data.table(matrix(nrow = 0,
+                                                ncol = length(c("ADMIN_AREA","WARD_CODE", class_subset, 'otherClass')))),
+                                                nm = c("ADMIN_AREA","WARD_CODE",class_subset, 'otherClass') )
+
+start.time <- Sys.time()
 
 for (csv in zipCSVs) {
   #the data dump has no headers. 
-  item <- paste0(hardpath, "/Data/OS_data/plus/FULL/CSV/DVD1/data/AddressBasePlus_FULL_2022-05-17_001_csv.zip")
-  tmp <- fread(archive_extract(item), select=c(6,62,71))# worked!
+  item <- paste0(hardpath, "/Data/OS_data/e90_ab_plus_csv_gb/",csv) 
+  tmp <- fread(archive_extract(item), select=c(6,62,71))
   tmp <- setNames(tmp, c('CLASS', 'ADMIN_AREA', 'WARD_CODE'))
   tmp <- tmp[, subclass := ifelse(CLASS %in% class_subset, CLASS , 'otherClass' )]
   
+  
+  #NOTE: might need to add ONS data for LSOAs
   
   ABfile <- tmp
   tmp_output <- ABfile[, by = c('ADMIN_AREA', 'WARD_CODE', 'subclass'), .(n = .N) ]
   tmp_output <- dcast( tmp_output, ADMIN_AREA + WARD_CODE ~ subclass, value.var = "n", fill = 0 )
   
-  AB_summary_output <- rbindlist(list(AB_summary_output,tmp_output), use.names=T)
+  AB_summary_output <- rbindlist(list(AB_summary_output,tmp_output), use.names=T, fill = T)
   
 }
-
 sematic_names <- paste0(ABplus_subset$Primary_Description,':',ABplus_subset$Class_Description )
 AB_summary_output <- setNames(AB_summary_output,
                                                 nm = c("ADMIN_AREA","WARD_CODE", sematic_names,'otherClasses') )
-
-
-if(F){
+ AB_summary_output[is.na(AB_summary_output)] <- 0
+ 
+ #totals_AB_summary_output <- AB_summary_output[, lapply(.SD,sum), by=.(ADMIN_AREA,WARD_CODE)]
+ totals_AB_summary_output <- AB_summary_output[,!"WARD_CODE"][, lapply(.SD,sum), by='ADMIN_AREA']
+ 
  totals <- colSums(AB_summary_output[,3:34])
  write.csv(totals ,  '../Outputs/OS_data_coverage_summary.csv' ) 
-}
+ write.csv(totals_AB_summary_output ,  '../Outputs/OS_data_coverage_summary_by_AdminArea.csv' )
 
+ 
+Sys.time() - start.time
 ```
+
+
+
+

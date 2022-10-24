@@ -19,129 +19,7 @@ loadRData <- function(fileName){
     get(ls()[ls() != "fileName"])
 }
 
-#get folders
-cross_data <- list.files(path = "../Data/RData_crossSectional", pattern = NULL, all.files = FALSE,
-           full.names = FALSE, recursive = FALSE,
-           ignore.case = FALSE, include.dirs = FALSE, no.. = FALSE)
-
-cross_data <- gsub(".RData","",as.character(cross_data))
-cross_data <- gsub("crossSectional_","",as.character(cross_data))
-
-EDA_cols <- read_csv("../Data/EDA_colour_scheme.csv")
-EDA_cols <- subset(EDA_cols[EDA_cols$geography_name %in%  cross_data, ])
-
-
-big_Dt <- data.table()
-for (WIP in EDA_cols$geography_name) {
- if(WIP == "Unknown") break; 
- region_df <- loadRData(paste0("../Outputs/WIP_crossSectional/ONSUD_crossSectional_baseline_",WIP,".RData") ) 
- region_df$CURRENT_ENERGY_EFFICIENCY <- as.numeric(region_df$CURRENT_ENERGY_EFFICIENCY)
- region_df$regionName
- big_Dt <- rbindlist(list(big_Dt,region_df))
-}
- 
-
-
 ```
-
-
-
-
-
-
-
-```{r resolving building age}
-
-col <- c("TRANSACTION_TYPE","INSPECTION_DATE")
-dt2007_onward <-  big_Dt[ nn_construction_age_band == '2007 onwards', ..col]
-dt2007_onward_n <- dt2007_onward[, by = "TRANSACTION_TYPE", .(n = .N)]
-
-
-dt2007_onward <- dt2007_onward[ n_construction_age := year(dt2007_onward$INSPECTION_DATE) ]
-
-
-# Stacked + percent
-plot_dt <- big_Dt[ , by = 'nn_construction_age_band',
-                   .(n = .N)]
-plot_dt$percent <- round(plot_dt$n/sum(plot_dt$n),3)
-
-ggplot(plot_dt, aes(fill=nn_construction_age_band, x= "", y=n)) + 
-  geom_bar(position="fill", stat="identity")+ 
-  coord_flip()+theme(axis.text.y=element_blank())
-
-
-plot_dt <- plot_dt[order(plot_dt$nn_construction_age_band),]
-plot_dt <- plot_dt[c(11, seq(1,10,1),12),]
-plot_dt[,setattr(nn_construction_age_band,'levels',c(plot_dt$nn_construction_age_band))]
-
-
-ggplot(plot_dt, aes(x=nn_construction_age_band, y=n))+ 
-  geom_bar(stat='identity')+ 
-  coord_flip()+theme(axis.text.y=element_blank())
-```
-
-
-
-
-```{r}
-#subset excludes : PROPERTY_TYPE = 'Park home' , n_builtForm = 'unknown'
-#it have new variables:
-#nn_construction_age_band
-#nn_CURRENT_ENERGY_EFFICIENCY
-#n_difference_potential
-
-save(big_Dt_subset, file = "../Outputs/WIP_crossSectional/ONSUD_crossSectional_subset_N16744771_.RData" )
-
-
-##Add IMD for EW by LSOA
-##Add inIMD for E by LSOA
-
-#Scatterplot: income deprivation rank by EPCs
-##consider doing a ggside for the IMD
-
-
-```
-
-
-
-
-
-```{r}
-ggplot(sample[], aes(x = nn_CURRENT_ENERGY_EFFICIENCY, colour = nn_construction_age_band )) +
-  #geom_density(lwd = 1.2, linetype = 1, position="identity",geom="line", bw = 2)+  
-  stat_density(lwd = 1.2, linetype = 1, position="identity",geom="line", bw = 2)+
-  facet_grid(rows = vars(n_builtForm))
-
-
-#facetgrid: tenure x built form, region
-
-#on running vs environmental: "CURRENT_ENERGY_EFFICIENCY", "ENVIRONMENT_IMPACT_CURRENT", "CO2_EMISS_CURR_PER_FLOOR_AREA","TOTAL_FLOOR_AREA"
-## is the difference of  POTENTIAL - CURRENT, larger for ENERGY_EFFICIENCY  vs. ENVIRONMENT_IMPACT? Are people max out on the greedy metric?
-## RQ: Is the cost environmental impact further from its potential than the running cost? 
-
-
-#on rich and spatious:
-#"CO2_EMISS_CURR_PER_FLOOR_AREA", "EXTENSION_COUNT","NUMBER_HABITABLE_ROOMS","NUMBER_HEATED_ROOMS","TOTAL_FLOOR_AREA"
-#View(big_Dt_subset[by = "TRANSACTION_TYPE", .(n = .N)])
-##RQ: Are the biggest homes, the most inefficient ones? Is there a difference by tenure? 
-```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 ```{r}
 regional_histo_plots <- list()
@@ -194,28 +72,6 @@ plot_obj +
 
 
 
-
-
-```{r}
-ggplot() + geom_histogram(data = region_df, 
-                              #aes_string('CURRENT_ENERGY_EFFICIENCY', colour = EDA_col),
-                              aes(CURRENT_ENERGY_EFFICIENCY , colour = n_tenure, fill = I(EDA_col), alpha=0.5 ),
-                              binwidth = 1)
-    
-    ggplot() + geom_histogram(data = region_df, 
-                              #aes_string('CURRENT_ENERGY_EFFICIENCY', colour = EDA_col),
-                              aes(CURRENT_ENERGY_EFFICIENCY , colour = n_builtForm, fill = I(EDA_col), alpha=0.5 ),
-                              binwidth = 1)
-    
-        
-    ggplot() + geom_density(data = region_df, 
-                              #aes_string('CURRENT_ENERGY_EFFICIENCY', colour = EDA_col),
-                              aes(CURRENT_ENERGY_EFFICIENCY , colour = n_builtForm, fill = I(EDA_col), alpha=0.5) )
-```
-
-
-
-
 ```{r testing_sample}
 region <- cross_data[4]
 
@@ -264,20 +120,8 @@ plot_obj +
 
 
 
-```{r ordered_scater}
-#CEE - Usage variable   
-#environmental impact rating. 
-#potential vs current 
-```
 
-
-
-
-
-
-
-
-```{r}
+```{r reginal_plots}
 #formatting:
 lettermapping <-  data.frame( letter = c('A','B','C','D','E','F','G'), 
                               cutoff = c(92, 81, 69, 55, 39, 21, 0))
@@ -320,7 +164,7 @@ for (WIP in EDA_cols$geography_name) {
 ```{r}
 library(ggridges)
 
-ggplot(big_Dt, aes(x=CURRENT_ENERGY_EFFICIENCY, y = regionName, fill=factor(..quantile..))) +
+ggplot(big_Dt, aes(x=CURRENT_ENERGY_EFFICIENCY, y = n_region, fill=factor(..quantile..))) +
     stat_density_ridges(geom = "density_ridges_gradient", calc_ecdf = TRUE, quantiles = c(0.25, 0.50), scale = 1,
                         from = 0, to = 100) +
     scale_fill_manual(values = c("#76b5c5", "#A0A0A0A0", "#C09085"),
@@ -340,6 +184,10 @@ ggplot(big_Dt, aes(x=CURRENT_ENERGY_EFFICIENCY, y = regionName, fill=factor(..qu
 
 
 ```{r empty_loop}
+EDA_cols <- read_csv("../Data/EDA_colour_scheme.csv")
+#EDA_cols <- subset(EDA_cols[EDA_cols$geography_name %in%  cross_data, ])
+
+
 #not working
 regional_plots <- list()
 start.time <- Sys.time()
@@ -350,24 +198,10 @@ for (WIP in EDA_cols$geography_name) {
  region_df$CURRENT_ENERGY_EFFICIENCY <- as.numeric(region_df$CURRENT_ENERGY_EFFICIENCY)
  print(paste(WIP, Sys.time()))
   
-  #Plot prep
-  ##set all the values that are over 100 to 101, EPCs aren't bound to 100 
-  region_df[CURRENT_ENERGY_EFFICIENCY > 101]$CURRENT_ENERGY_EFFICIENCY <- 101
-  EDA_col <-  EDA_cols$colour[which(EDA_cols$geography_name %in% region)]
-  
-  
-  
-  
-  
 }
 
 print(paste('loop time:', Sys.time() - start.time))
 ```
-
-
-
-
-
 
 
 

@@ -5,6 +5,178 @@ date: "August 9, 2022"
 output: html_document
 ---
 
+```{r}
+cleanup <- list.files("C:\\Users\\bonni\\Dropbox\\_PhD\\Application Documents\\CASA RA\\RA OS NARRATE CASA\\Code" )
+
+write.csv(cleanup, "C:\\Users\\bonni\\Dropbox\\_PhD\\Application Documents\\CASA RA\\RA OS NARRATE CASA\\Code\\ReadMe.csv")
+```
+
+
+
+```{r}
+setcolorder(region_df, c("n_UPRN", setdiff(names(region_df), "n_UPRN")))
+View( region_df[duplicated(region_df$n_UPRN)][order(n_UPRN)]  ) 
+```
+
+```{r}
+
+big_P2B1_Dt <- data.table()
+
+for (WIP in cross_data) {
+  print(paste(WIP, Sys.time()))
+  region_df <- loadRData(paste0("../Data/RData_crossSectional/crossSectional_",WIP,".RData") )
+  #tmp <- tmp[,..cols]#make the df smaller here
+  big_P2B1_Dt <- rbindlist(list(big_P2B1_Dt,region_df))
+
+  
+  total <- lengths(region_df)[1]
+  dups <-   sum(duplicated(region_df$n_UPRN))
+  
+  print(paste(WIP,
+              '- has total:', total,
+              '| dups: ', dups, '- as per cent',
+              round(dups/total * 100), '%' ))
+}
+
+```
+
+
+```{r P3_CrossSectional_ONSUD}
+
+big_ONSUD_Dt <- data.table()
+
+for (WIP in cross_data) {
+  print(paste(WIP, Sys.time()))
+  region_df <- loadRData(paste0("../Data/RData_crossSectional/crossSectional_",WIP,".RData") )
+  #tmp <- tmp[,..cols]#make the df smaller here
+  big_ONSUD_Dt <- rbindlist(list(big_ONSUD_Dt,region_df))
+
+  
+  total <- lengths(region_df)[1]
+  dups <-   sum(duplicated(region_df$n_UPRN))
+  
+  print(paste(WIP,
+              '- has total:', total,
+              '| dups: ', dups, '- as per cent',
+              round(dups/total * 100), '%' ))
+}
+```
+
+# P2B2_CS_MD template
+
+```{r loop_template}
+# #get folders
+# cross_data <- list.files(path = "../Data/RData_crossSectional", pattern = NULL, all.files = FALSE,
+#            full.names = FALSE, recursive = FALSE,
+#            ignore.case = FALSE, include.dirs = FALSE, no.. = FALSE)
+# 
+# cross_data <- gsub(".RData","",as.character(cross_data))
+# cross_data <- gsub("crossSectional_","",as.character(cross_data))
+
+
+LAD_table <- data.table()
+start.time <- Sys.time()
+
+for (region in cross_data) {
+  print(paste(region, Sys.time()))
+  tmp <- loadRData(paste0("../Data/RData_crossSectional/crossSectional_",region,".RData") )
+  
+  
+  for (LA in unique(tmp$LAD11NM)) {
+    tmp_LA <- tmp # tmp[ LAD11NM == LA, c('a','b','c')]
+    #t_LAD_row <- tmp_LA[,.N ,by = c('x','y','z')]
+  }
+}
+
+print(paste('loop time:', Sys.time() - start.time))#empty loop runs about 10 mins
+
+if(F){
+  save(tmp, file = paste0("../Outputs/WIP_crossSectional/crossSectional_baseline_",region,".RData") )
+  write.xlsx(LAD_table,
+             file = "../Data/CrossSectional_Summary.xlsx", sheetName="SHEET", append=TRUE)
+}
+
+print(paste('save time:', Sys.time() - start.time))
+```
+
+
+```{r loop_data_query}
+# #get folders
+# cross_data <- list.files(path = "../Data/RData_crossSectional", pattern = NULL, all.files = FALSE,
+#            full.names = FALSE, recursive = FALSE,
+#            ignore.case = FALSE, include.dirs = FALSE, no.. = FALSE)
+# 
+# cross_data <- gsub(".RData","",as.character(cross_data))
+# cross_data <- gsub("crossSectional_","",as.character(cross_data))
+LAD_table <- data.table()
+start.time <- Sys.time()
+
+for (region in cross_data) {
+  print(paste(region, Sys.time()))
+  tmp <- loadRData(paste0("../Data/RData_crossSectional/crossSectional_",region,".RData") )
+  
+  
+  for (LA in unique(tmp$LAD11NM)) {
+    tmp_LA <- tmp # tmp[ LAD11NM == LA, c('a','b','c')]
+    #t_LAD_row <- tmp_LA[,.N ,by = c('x','y','z')]
+  }
+}
+
+print(paste('loop time:', Sys.time() - start.time))#empty loop runs about 10 mins
+
+if(F){
+  save(tmp, file = paste0("../Outputs/WIP_crossSectional/crossSectional_baseline_",region,".RData") )
+  write.xlsx(LAD_table,
+             file = "../Data/CrossSectional_Summary.xlsx", sheetName="SHEET", append=TRUE)
+}
+
+print(paste('save time:', Sys.time() - start.time))
+```
+
+
+
+#possibly delete
+
+
+```{r checking_where_dups_come}
+
+CS_big_Dt <- data.table()
+for (region in cross_data) {
+  #region = cross_data[4] #testing
+  print(paste(region, Sys.time()))
+  
+  tmp <- loadRData(paste0("../Data/RData_crossSectional/crossSectional_",region,".RData") )
+  CS_big_Dt <- rbindlist(list(CS_big_Dt,tmp))
+}
+
+sum(duplicated(CS_big_Dt$n_UPRN)) #  1 564 548
+
+
+ONSUD_big_Dt <- data.table()
+for (WIP in EDA_cols$geography_name) {
+ if(WIP == "Unknown") break; 
+ region_df <- loadRData(paste0("../Outputs/WIP_crossSectional/ONSUD_crossSectional_baseline_",WIP,".RData") ) 
+ region_df$CURRENT_ENERGY_EFFICIENCY <- as.numeric(region_df$CURRENT_ENERGY_EFFICIENCY)
+ region_df$regionName
+ ONSUD_big_Dt <- rbindlist(list(ONSUD_big_Dt,region_df))
+}
+
+sum(duplicated(ONSUD_big_Dt$n_UPRN)) #  94 3614
+```
+
+
+```{r debugging}
+#P4_CrossSectional_EDA_Agebands_Builtform_Propertytype.Rmd
+big_Dt_CSsubset_N6M7 <- loadRData("../Outputs/WIP_crossSectional/ONSUD_crossSectional_subset_N16744771.RData") #see
+sum(duplicated(big_Dt_CSsubset_N6M7$n_UPRN)) # 909 529
+
+big_Dt_CSsubset_N6M7[ test:= concatenate()]
+```
+
+
+
+
+
 
 ```{r check}
 #327 LAD, 10 + 1 regions
@@ -30,7 +202,7 @@ for (region in long_data) {
 }
 ```
 
-```{r check1}
+```{r check1 loop thourgh }
 longitudinalEPCs_long <- data.frame()
 print_counter = 0
 
@@ -70,10 +242,12 @@ for (LA in folders_sorted_by_regional_LUT) {
 
   }
   
-print(paste('loop time:', Sys.time() - start.time))#"loop time: 2.35320606278049"
+print(paste('loop time:', Sys.time() - start.time))
 ```
 
-```{r}
+
+
+```{r loop through raw EPC}
  #print_counter = print_counter+1
   #if(print_counter %% 20 == 0){print(LA)} 
   if(F){

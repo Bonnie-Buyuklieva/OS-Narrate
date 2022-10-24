@@ -128,7 +128,7 @@ ggplot(subset_P95, aes(x = CO2_EMISS_CURR_PER_FLOOR_AREA, colour = n_habitable_r
 
 
 
-```{r}
+```{r deprivation}
 ggplot(subset_P95[!is.na(n_bIoDDecil_income_grp),], aes(x = CO2_EMISS_CURR_PER_FLOOR_AREA, colour = n_tenure)) +
     #geom_density(lwd = 1.2, linetype = 1, position="identity",geom="line", bw = 2)+  
     stat_density(lwd = 1, linetype = 1, position="identity",geom="line", bw = 2)+

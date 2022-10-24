@@ -83,35 +83,39 @@ setkey(additional_dt,LMK_KEY) #additional_dt saved in memory as LUT only
 
 
 ```{r assign region to unknown entries}
-unknown_region_df<- loadRData( paste0("../Outputs/WIP_crossSectional/crossSectional_baseline_","Unknown",".RData") )
-setkey(unknown_region_df, n_UPRN)
+# #Now MOVED TO 00_P1
+# if(F){
+#  unknown_region_df<- loadRData( paste0("../Outputs/WIP_crossSectional/crossSectional_baseline_","Unknown",".RData") )
+# setkey(unknown_region_df, n_UPRN)
+# 
+# #tmp <-  unknown_region_df #head(unknown_region_df, 100)
+# 
+# for(ONSUD in EDA_cols$ONSUD){
+#   #for every ONS file, check if we can assign a region based on the UPRN data
+#   start.time <- Sys.time()
+#   if(is.na(ONSUD))break;  
+#   ONSUD_MAY_2020 <- fread(paste0("../Data/ONSUD_MAY_2020/Data/ONSUD_MAY_2020_",ONSUD,".csv"),
+#                           colClasses = c("uprn" = "character"))
+#   setkey(ONSUD_MAY_2020, uprn)
+# 
+#   unknown_region_df$uprn <- unknown_region_df$n_UPRN
+#   unknown_region_df[ONSUD_MAY_2020, on = 'uprn', oa11cd := i.oa11cd]
+#   unknown_region_df[ONSUD_MAY_2020, on = 'uprn', lad19cd := i.lad19cd]
+#   unknown_region_df[ONSUD_MAY_2020, on = 'uprn', lsoa11cd := i.lsoa11cd]
+#   unknown_region_df[ONSUD_MAY_2020, on = 'uprn', rgn17cd := i.rgn17cd]
+#   #print(ONSUD)
+# }
+#  
+#   #merge additional raw data
+#   setkey(unknown_region_df,LMK_KEY)
+#   unknown_region_df <- additional_dt[unknown_region_df, on = 'LMK_KEY']
+# 
+# print(paste('loop time:', Sys.time() - start.time))# 15 mins
+# 
+# dt_for_assignmnet <- unknown_region_df[!is.na(lsoa11cd),]
+# #8 249 of 9 794 are assigned a LSOA, using UPRNs only  
+# }
 
-#tmp <-  unknown_region_df #head(unknown_region_df, 100)
-
-for(ONSUD in EDA_cols$ONSUD){
-  #for every ONS file, check if we can assign a region based on the UPRN data
-  start.time <- Sys.time()
-  if(is.na(ONSUD))break;  
-  ONSUD_MAY_2020 <- fread(paste0("../Data/ONSUD_MAY_2020/Data/ONSUD_MAY_2020_",ONSUD,".csv"),
-                          colClasses = c("uprn" = "character"))
-  setkey(ONSUD_MAY_2020, uprn)
-
-  unknown_region_df$uprn <- unknown_region_df$n_UPRN
-  unknown_region_df[ONSUD_MAY_2020, on = 'uprn', oa11cd := i.oa11cd]
-  unknown_region_df[ONSUD_MAY_2020, on = 'uprn', lad19cd := i.lad19cd]
-  unknown_region_df[ONSUD_MAY_2020, on = 'uprn', lsoa11cd := i.lsoa11cd]
-  unknown_region_df[ONSUD_MAY_2020, on = 'uprn', rgn17cd := i.rgn17cd]
-  #print(ONSUD)
-}
- 
-  #merge additional raw data
-  setkey(unknown_region_df,LMK_KEY)
-  unknown_region_df <- additional_dt[unknown_region_df, on = 'LMK_KEY']
-
-print(paste('loop time:', Sys.time() - start.time))# 15 mins
-
-dt_for_assignmnet <- unknown_region_df[!is.na(lsoa11cd),]
-#8 249 of 9 794 are assigned a LSOA, using UPRNs only 
 ```
 
 

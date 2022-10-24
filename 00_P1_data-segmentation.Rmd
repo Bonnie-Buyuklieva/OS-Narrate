@@ -1,0 +1,434 @@
+---
+title: "Duplicate EPCs in V10"
+author: "Boyana Buyuklieva"
+date: "May 20, 2022"
+output: html_document
+---
+
+#This version is has linear time complexity. 
+
+```{r setup, include=FALSE, echo = T}
+knitr::opts_chunk$set(echo = TRUE)
+library(data.table)
+library(readr)
+library(readxl)
+library(microbenchmark)
+library(fasttime)
+options(scipen=999)
+
+#get folders
+folders <- list.files(path = "../Data/all-domestic-certificates", pattern = NULL, all.files = FALSE,
+           full.names = FALSE, recursive = FALSE,
+           ignore.case = FALSE, include.dirs = FALSE, no.. = FALSE)
+folders <- folders[-342] #remove the .txt
+
+#Regional LUT
+region_LUT <- read_excel("../Data/LAD_region_LUT.xlsx")
+region_LUT <- region_LUT[order(region_LUT$RGN11NM),] # order folders by region
+
+#UBDC LUT
+start.time <- Sys.time()
+ubdc_LUT <- fread("../Data/ubdc_link.csv",  
+                  select = c("lmk_key","ubdc_uprn"),
+                  colClasses = c("lmk_key" = "character",
+                                 "ubdc_uprn" = "character"))
+setnames(ubdc_LUT, c("lmk_key","ubdc_uprn"), c("LMK_KEY","ubdc_uprn"))
+setkey(ubdc_LUT,LMK_KEY)
+
+print(paste('fread import:', Sys.time() - start.time)) #approx 7 mins
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+# New Duplicate Defintion Testing
+```{r loop}
+longitudinalEPCs_long <- list()
+crossSect_EPCs <- list() 
+big_crossSect_EPCs <- list()
+print_counter = 0
+
+start.time <- Sys.time()
+for (LA in region_LUT$folder_name) {
+  if(LA == region_LUT$folder_name[1]){
+    #set up the first region
+    previous_region <- region_LUT$RGN11NM[1] 
+  }
+  print_counter = print_counter+1
+  if(print_counter %% 20 == 0){print(LA)} 
+  
+  #testing:
+  #LA = region_LUT$folder_name[2]
+  #print(LA)
+  #view_priority <- c("n_UPRN","INSPECTION_DATE","POSTCODE","str_concat", grep('tmp_', names(certificates), value = T))
+  #setorder(certificates , n_UPRN, str_concat, tmp_str_dup )
+  #View(certificates[,..view_priority]  )
+  
+  
+  #read subset only for speed:
+  readcols <- c("LMK_KEY","INSPECTION_DATE","UPRN","ADDRESS","POSTCODE",
+                "UPRN_SOURCE","CURRENT_ENERGY_RATING","CURRENT_ENERGY_EFFICIENCY",
+                "LOCAL_AUTHORITY","LOCAL_AUTHORITY_LABEL")
+  #read all as char, then parse for error catching
+  my_colClasses <- cbind.data.frame(readcols,  c( rep("character",length(readcols)) )  )
+  #read as data.tables
+  suppressWarnings(certificates <- fread(paste0("../Data/all-domestic-certificates/",LA,"/certificates.csv"),
+                        select =  readcols, 
+                        colClasses=my_colClasses))
+  setkey(certificates, LMK_KEY)
+  
+  
+  #convert to date.time
+  certificates[, INSPECTION_DATE := fastPOSIXct(INSPECTION_DATE, required.components = 3L)] #3 means only the date is required to a conversion to be valid
+  #update_region_counter
+  id <- which(region_LUT$folder_name == LA)
+  current_region <- region_LUT$RGN11NM[id]  
+  #add LAD & RGN cols
+  certificates[,RGN11NM := current_region]
+  certificates[,LAD11NM := region_LUT$LAD11NM[id]]
+  
+  
+  ##make a column based on the ubdc LUT
+  col_ubdc_LUT <- ubdc_LUT[certificates$LMK_KEY, 'ubdc_uprn']
+  certificates[,ubdc_UPRN := col_ubdc_LUT]
+  ###make col n_UPRN where this would UPRN, 
+  certificates[ , n_UPRN := UPRN] 
+  #or take ubdc_UPRN where its missing
+  certificates[ n_UPRN == '',  n_UPRN := ubdc_UPRN]
+  certificates[ , n_UPRN := gsub(" ", "", n_UPRN, fixed = TRUE)] 
+  
+  ##tmp columns for identifying dups:
+  certificates[ , tmp_na_n_UPRN := is.na(certificates$n_UPRN)]#no n_UPRN
+  certificates[,  str_concat := tolower(paste(ADDRESS, POSTCODE))]##combined str dups
+  
+  
+  
+  #####################################
+  ##Longitudinal Data Table
+  ##################################### 
+  #All Dups based on n_UPRN
+  setorder(certificates, n_UPRN, -INSPECTION_DATE)
+  certificates[ , tmp_n_UPRN_dup := ifelse(tmp_na_n_UPRN, F, duplicated(certificates$n_UPRN)|duplicated(certificates$n_UPRN, fromLast = T))]
+  #All Dups based on address + postcode
+  setorder(certificates, str_concat, -INSPECTION_DATE)
+  certificates[ , tmp_str_dup := duplicated(certificates$str_concat)|duplicated(certificates$str_concat, fromLast = T)]
+  #####################################
+  duplicated_certificates <- certificates[tmp_n_UPRN_dup | tmp_str_dup,]
+
+
+  #Assigning UPRNs to duplicated entries based on dictionary
+  ##CASE 1: identical string address repeats with UPRN value sometimes missing
+  ##example: "domestic-E06000001-Hartlepool":'Mount Oswald Nursing Home, 16 Hutton Avenue TS26 9PN'
+  dict <- duplicated_certificates[ !is.na(n_UPRN), c('str_concat','n_UPRN','INSPECTION_DATE')]
+  
+  ##CASE 2: identical string address repeats with different UPRN values
+  ##example: "domestic-E06000001-Hartlepool":"Gospel Hall, 32 Town Wall TS24 0JQ"
+  ##resolution: assume the most recent UPRN to be the right one #possible extension here for string comparison with OS
+  dict <-  dict[order(-INSPECTION_DATE), c('str_concat','n_UPRN')]
+  dict <-  dict[!duplicated(str_concat), ]
+  dict <- setkey(as.data.table(dict), str_concat)
+  
+  
+  duplicated_certificates  <- duplicated_certificates[,n_UPRN := dict[duplicated_certificates$str_concat, 'n_UPRN']] 
+  rm(dict)
+  duplicated_certificates  <- duplicated_certificates[order(n_UPRN, str_concat, -INSPECTION_DATE),]
+  duplicated_certificates$n_GRP <-ifelse(is.na(duplicated_certificates$n_UPRN), duplicated_certificates$str_concat, duplicated_certificates$n_UPRN )
+  #View(duplicated_certificates[, c('n_GRP','str_concat','n_UPRN','INSPECTION_DATE')])
+  #Output: Append to long list
+  longitudinalEPCs_long<- rbindlist(list(longitudinalEPCs_long,duplicated_certificates ))
+  
+  
+  
+  
+  #####################################
+  ##Cross Sectional Data Table
+  #####################################    
+  #One-off Dups based on n_UPRN
+  setorder(certificates, n_UPRN, -INSPECTION_DATE) #sort with most recent entry first
+  certificates[ , tmp_n_UPRN_dup := duplicated(certificates$n_UPRN) & !tmp_na_n_UPRN]
+  
+  #One-off Dups based on address + postcode
+  setorder(certificates, str_concat, -INSPECTION_DATE)#sort with most recent entry first
+  certificates[ , tmp_str_dup := duplicated(certificates$str_concat)]
+  
+  #####################################
+  #return where neither the n_UPRN or concatenated address repeat
+  crossSect_EPCs <- certificates[ tmp_n_UPRN_dup == F & tmp_str_dup == F,] #possible extension here for fuzzy matching 
+  
+  #some identical UPRNs are assigned the wrong LAD
+  big_crossSect_EPCs<- rbindlist(list(big_crossSect_EPCs,crossSect_EPCs ))
+  #####################################
+  #View(crossSect_EPCs[tmp_na_n_UPRN == T, ..view_priority]  ) 
+  #####################################
+  #####################################
+  
+  
+  # #write to file by region if changed
+  if(current_region != previous_region){
+    save(longitudinalEPCs_long, file = paste0("../Data/RData_longitudinal/longitudinalEPCs_",previous_region,".RData") )
+    
+    previous_region <- current_region
+    
+    crossSect_EPCs <- list()
+    longitudinalEPCs_long <- list()
+  }
+
+}
+
+#big_crossSect_EPCs has duplicates that arise when folders are combined. Likely due to properties where LAD boundaried have changed or else human error:
+big_crossSect_EPCs_cleaned <- big_crossSect_EPCs
+rm(big_crossSect_EPCs)
+setorder(big_crossSect_EPCs_cleaned, str_concat, -INSPECTION_DATE )
+big_crossSect_EPCs_cleaned <- big_crossSect_EPCs_cleaned[!duplicated(big_crossSect_EPCs_cleaned$str_concat),] # dropped 1 696
+setorder(big_crossSect_EPCs_cleaned, n_UPRN, -INSPECTION_DATE )
+big_crossSect_EPCs_cleaned <- big_crossSect_EPCs_cleaned[ !(duplicated(big_crossSect_EPCs_cleaned$n_UPRN) == T & is.na(big_crossSect_EPCs_cleaned$n_UPRN) == F),] #drop 9 170
+save(big_crossSect_EPCs_cleaned, file = paste0("../Data/RData_crossSectional/big_crossSect_EPCs_cleaned.RData") )  
+
+
+#some properties are unique in their LAD, but assigned to different LADs over time. These are captured below and added to 
+
+save(longitudinalEPCs_long, file = paste0("../Data/RData_longitudinal/longitudinalEPCs_",previous_region,".RData") )
+
+
+DLUC_LAD_error <- big_crossSect_EPCs[ duplicated(big_crossSect_EPCs$n_UPRN)|duplicated(big_crossSect_EPCs$n_UPRN, fromLast = T)]
+DLUC_LAD_error <- DLUC_LAD_error[!is.na(DLUC_LAD_error$n_UPRN),]
+write.csv(DLUC_LAD_error,"../Data/00_P1_DLUC_LAD_error.csv")
+save(DLUC_LAD_error, file = paste0("../Data/RData_longitudinal/longitudinalEPCs_DLUC_LAD_error.RData") )      
+      
+print(paste('loop time:', Sys.time() - start.time))#"loop time: 2h"
+```
+
+
+
+
+
+
+
+```{r places_with_no_UPRNs}
+no_UPRN <- list() 
+
+for (LA in region_LUT$folder_name) {
+#read subset only for speed:
+  readcols <- c("LMK_KEY","INSPECTION_DATE","UPRN","ADDRESS","POSTCODE",
+                "UPRN_SOURCE","CURRENT_ENERGY_RATING","CURRENT_ENERGY_EFFICIENCY",
+                "LOCAL_AUTHORITY","LOCAL_AUTHORITY_LABEL")
+  
+  #read all as char, then parse for error catching
+  my_colClasses <- cbind.data.frame(readcols,  c( rep('character',length(readcols)) )  )
+  #read as data.tables
+  certificates <- fread(paste0("../Data/all-domestic-certificates/",LA,"/certificates.csv"),
+                       select =  readcols, 
+                       colClasses=my_colClasses)
+  setkey(certificates, LMK_KEY)
+
+      col_ubdc_LUT <- ubdc_LUT[certificates$LMK_KEY, 'ubdc_uprn']
+    certificates[,ubdc_UPRN := col_ubdc_LUT]
+    
+    ##combined str dups
+    certificates[,str_concat := paste(ADDRESS, POSTCODE)]
+
+    ###make col n_UPRN where this would UPRN, 
+    certificates[ , n_UPRN := UPRN] 
+    #or take ubdc_UPRN where its missing
+    certificates[ n_UPRN == '',  n_UPRN := ubdc_UPRN]
+    
+    
+    
+    mising_UPRN <- is.na(certificates$UPRN)
+    missing_n_UPRN <- is.na(certificates$n_UPRN)
+    
+    #places that could be found in the OS DataBase. 
+    View(certificates[missing_n_UPRN])
+    
+    no_UPRN <- rbindlist(list(no_UPRN, certificates[missing_n_UPRN] ))
+}  
+```
+
+```{r assign region to unknownLAD}
+unknown_region_df<- loadRData( paste0("../Outputs/WIP_crossSectional/crossSectional_baseline_","Unknown",".RData") )
+setkey(unknown_region_df, n_UPRN)
+
+#tmp <-  unknown_region_df #head(unknown_region_df, 100)
+
+for(ONSUD in EDA_cols$ONSUD){
+  #for every ONS file, check if we can assign a region based on the UPRN data
+  start.time <- Sys.time()
+  if(is.na(ONSUD))break;  
+  ONSUD_MAY_2020 <- fread(paste0("../Data/ONSUD_MAY_2020/Data/ONSUD_MAY_2020_",ONSUD,".csv"),
+                          colClasses = c("uprn" = "character"))
+  setkey(ONSUD_MAY_2020, uprn)
+
+  unknown_region_df$uprn <- unknown_region_df$n_UPRN
+  unknown_region_df[ONSUD_MAY_2020, on = 'uprn', oa11cd := i.oa11cd]
+  unknown_region_df[ONSUD_MAY_2020, on = 'uprn', lad19cd := i.lad19cd]
+  unknown_region_df[ONSUD_MAY_2020, on = 'uprn', lsoa11cd := i.lsoa11cd]
+  unknown_region_df[ONSUD_MAY_2020, on = 'uprn', rgn17cd := i.rgn17cd]
+  #print(ONSUD)
+}
+ 
+  #merge additional raw data
+  setkey(unknown_region_df,LMK_KEY)
+  unknown_region_df <- additional_dt[unknown_region_df, on = 'LMK_KEY']
+
+print(paste('loop time:', Sys.time() - start.time))# 15 mins
+
+dt_for_assignmnet <- unknown_region_df[!is.na(lsoa11cd),]
+#8 249 of 9 794 are assigned a LSOA, using UPRNs only 
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Duplicate Defintion Testing
+```{r loop}
+longitudinalEPCs_long <- list()
+print_counter = 0
+
+#using this instead of directory folders, to sort by region
+folders_sorted_by_regional_LUT <- regional_LUT[order(RGN11NM)]$Folder
+#replaces the if statement
+previous_region <- regional_LUT[order(RGN11NM)]$RGN11NM[1]
+mapping <- list() 
+
+
+start.time <- Sys.time()
+for (LA in folders_sorted_by_regional_LUT) {
+  
+  print(LA)
+  
+  print_counter = print_counter+1
+  if(print_counter %% 20 == 0){print(LA)} 
+  
+  certificates <- fread(paste0("../Data/all-domestic-certificates/",LA,"/certificates.csv"),
+                        colClasses = c(       #'LMK_KEY' = 'character', 
+                                              'LODGEMENT_DATETIME' = 'character',
+                                              'CURRENT_ENERGY_RATING' = 'character',
+                                              'CURRENT_ENERGY_EFFICIENCY' = 'character',
+                                              'ADDRESS' = 'character',
+                                              'POSTCODE' = 'character',
+                                              'UPRN' = 'character',
+                                              'UPRN_SOURCE' = 'character',
+                                              'LOCAL_AUTHORITY' = 'character',
+                                              'LOCAL_AUTHORITY_LABEL' = 'character',
+                                              'POSTTOWN' = 'character',
+                                              'CONSTITUENCY_LABEL' = 'character',
+                                              'TRANSACTION_TYPE' = 'character',
+                                              'TENURE' = 'character'))
+  
+    
+    id <- which(regional_LUT$Folder == LA)
+    current_region <- regional_LUT[id]$RGN11NM
+    certificates[,RGN11NM := current_region]
+    certificates[,LAD11NM := regional_LUT[id]$LAD11NM]
+    
+    
+    if(current_region != previous_region){
+      save(mapping, file = paste0("../Data/RData_crossSectional/crossSectional_",previous_region,".RData") )
+      save(longitudinalEPCs_long, file = paste0("../Data/RData_longitudinal/longitudinalEPCs_",previous_region,".RData") )
+      
+      previous_region<- current_region
+      
+      mapping <- list()  
+      longitudinalEPCs_long <- list()
+    }
+    
+    
+    
+    
+    
+    
+    #convert to date.time
+    certificates[, INSPECTION_DATE := fastPOSIXct(INSPECTION_DATE, required.components = 3L)] #3 means only the date is required to a conversion to be valid
+    
+    #Create the Longitudinal Dataset
+    #-------------------------------------------------------------------------------------------------------------------------------
+    ##LUT dups
+    tmp <- ubdc_LUT[certificates$LMK_KEY, 'ubdc_uprn']
+    certificates[,ubdc_UPRN := tmp]
+    
+    ##combined str dups
+    certificates[,str_concat := paste(ADDRESS, POSTCODE)]
+
+    ###..make col n_UPRN where this would UPRN, or ubdc_UPRN where its missing
+    certificates[ , n_UPRN := UPRN] 
+    certificates[ n_UPRN == '',  n_UPRN := ubdc_UPRN]
+    
+    
+    repeat_str <- duplicated(certificates$str_concat)|duplicated(certificates$str_concat, fromLast = T)
+    
+    #changed syntax because duplicate() won't work. The version of duplicated (duplicated.integer64() does not implement fromLast AND ignores the args! LOL 🥲)
+    ## example: duplicated(certificates$n_UPRN, fromLast = T ) [c(6971,14575)] = F, T
+    repeat_nUPRN <- (duplicated(certificates, by = "n_UPRN")|duplicated(certificates, by = "n_UPRN", fromLast = T)) & !(certificates$n_UPRN == '')
+ 
+
+    dup_idx <- union(which(repeat_str),which(repeat_nUPRN))
+    duplicated_certificates <- as.data.table(certificates[dup_idx,])
+    duplicated_certificates <- duplicated_certificates[order(UPRN,str_concat,ubdc_UPRN, INSPECTION_DATE),]
+    #View(duplicated_certificates[,..check])# these duplicates seems fine
+    #duplicated_certificates[ n_UPRN == '10009711048',..check]
+    
+    
+    
+    #Problem 1: Assigning UPRNs
+    ##CASE 1: idential string address repeats with UPRN value sometimes missing
+    ## example: "domestic-E06000001-Hartlepool":'Mount Oswald Nursing Home, 16 Hutton Avenue TS26 9PN'
+    dict <- duplicated_certificates[ !is.na(n_UPRN), c('str_concat','n_UPRN','INSPECTION_DATE')]
+    
+    ##CASE 2: idential string address repeats with different UPRN values
+    ## example: "domestic-E06000001-Hartlepool":"Gospel Hall, 32 Town Wall TS24 0JQ"
+    ## resolution is to assume the most recent UPRN to be right one
+    #potential problem
+    dict <-  dict[order(-INSPECTION_DATE), c('str_concat','n_UPRN')]
+    dict <-  dict[!duplicated(str_concat), ]
+    dict <- setkey(as.data.table(dict), str_concat)
+    duplicated_certificates  <- duplicated_certificates[,n_UPRN := dict[duplicated_certificates$str_concat, 'n_UPRN']] 
+    duplicated_certificates  <- duplicated_certificates[order(n_UPRN, str_concat, -INSPECTION_DATE),]
+    duplicated_certificates$n_GRP <-ifelse(is.na(duplicated_certificates$n_UPRN), duplicated_certificates$str_concat, duplicated_certificates$n_UPRN )
+    #View(duplicated_certificates[, c('n_GRP','str_concat','n_UPRN','INSPECTION_DATE')])
+    
+    #Output: Append to long list
+    longitudinalEPCs_long<- rbindlist(list(longitudinalEPCs_long,duplicated_certificates ))
+    #-------------------------------------------------------------------------------------------------------------------------------
+    
+    #Create the Crossectional Dataset (include only most recent obvervations of repeat entries)
+    #------------------------------------------------------------------------------------------------------------------------------
+    ###Problem 2: Identifing all repeats, except the latest observations to create blacklist
+    tmp_mapping_blacklist <- as.data.table(duplicated_certificates[which( !duplicated(duplicated_certificates$n_GRP) ),]$LMK_KEY )
+    tmp_mapping <- certificates[!certificates$LMK_KEY %in% tmp_mapping_blacklist$V1,] #keep those outside the blacklist
+    mapping <- rbindlist(list(mapping,tmp_mapping ))
+   #------------------------------------------------------------------------------------------------------------------------------
+}
+
+save(mapping, file = paste0("../Data/RData_crossSectional/crossSectional_",current_region,".RData") )
+save(longitudinalEPCs_long, file = paste0("../Data/RData_longitudinal/longitudinalEPCs_",current_region,".RData") )
+      
+
+      
+      
+print(paste('loop time:', Sys.time() - start.time))#"loop time: 2.35320606278049"
+```
+
+
