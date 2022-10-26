@@ -10,20 +10,264 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE, cache.lazy = FALSE)
 # library(dplyr)
 # library(tidyverse)
-# library(data.table)
-# library(readr)
-# library(foreign)
 # library(ggExtra)
 # library(gridExtra)
 
-
+library(data.table)
+library(readr)
 # loads: loadRData
 source("../Outputs/Thesis_custom_scripts.R", local = knitr::knit_global())
+
+#All of these contain entries where the UPRN is NULL, but the address is unique
+#sum(duplicated(big_SC_dt$n_UPRN)) == sum(is.na(big_SC_dt$n_UPRN)) + 1
 big_SC_dt<- loadRData( "../Data/RData_crossSectional/big_crossSect_EPCs_cleaned_N16m984358.RData") 
 additional_dt <- loadRData( "../Data/RData_crossSectional/big_crossSect_EPCs_cleaned_N16m984358_additional_dt.RData") 
+
+
+combi_SC_dt <-merge(big_SC_dt, additional_dt, by = 'LMK_KEY', all = TRUE)
+```
+
+
+# Edits to EE & EI
+```{r EE & EI checks}
+#formatting:
+lettermapping <-  data.frame( letter = c('A','B','C','D','E','F','G'), 
+                              cutoff = c(92, 81, 69, 55, 39, 21, 0))
+
+#convert to numeric
+combi_SC_dt[,CURRENT_ENERGY_EFFICIENCY := as.integer(CURRENT_ENERGY_EFFICIENCY)]
+combi_SC_dt[,POTENTIAL_ENERGY_EFFICIENCY:=as.integer(POTENTIAL_ENERGY_EFFICIENCY)]
+
+combi_SC_dt[,ENVIRONMENT_IMPACT_CURRENT:=as.integer(ENVIRONMENT_IMPACT_CURRENT)]
+combi_SC_dt[,ENVIRONMENT_IMPACT_POTENTIAL:=as.integer(ENVIRONMENT_IMPACT_POTENTIAL)]
+
+#No void entries
+sum(is.na(combi_SC_dt$CURRENT_ENERGY_EFFICIENCY))
+sum(is.na(combi_SC_dt$POTENTIAL_ENERGY_EFFICIENCY))
+sum(is.na(combi_SC_dt$ENVIRONMENT_IMPACT_CURRENT))
+sum(is.na(combi_SC_dt$ENVIRONMENT_IMPACT_POTENTIAL))
+
+# Invalid entries [n = 73] are some with EE = 0, and more with EE > 100.
+combi_SC_dt[ , by = CURRENT_ENERGY_RATING, .N ]
+combi_SC_dt[ CURRENT_ENERGY_EFFICIENCY == 0, .N] # 7 zero entries. 
+combi_SC_dt[ CURRENT_ENERGY_EFFICIENCY >  100 , .N] 
+#View(combi_SC_dt[ CURRENT_ENERGY_RATING == 'INVALID!', list(CURRENT_ENERGY_EFFICIENCY,ENVIRONMENT_IMPACT_CURRENT) ])
+
+# Invalid entries are some with EI = 0
+# combi_SC_dt[ ENVIRONMENT_IMPACT_CURRENT == '0', .N ] # 7 
+```
+
+
+```{r EE & EI Adjusting values over 100, the A+}
+# round(quantile(combi_SC_dt$CURRENT_ENERGY_EFFICIENCY, 0.99, na.rm = T),0) #87 
+# round(quantile(combi_SC_dt$POTENTIAL_ENERGY_EFFICIENCY, 0.99, na.rm = T),0) #97 
+# round(quantile(combi_SC_dt$ENVIRONMENT_IMPACT_CURRENT, 0.99, na.rm = T),0) #93 
+# round(quantile(combi_SC_dt$ENVIRONMENT_IMPACT_POTENTIAL, 0.99, na.rm = T),0) #100 
+
+#Edit 1: CEE values over 100 are set to 101
+combi_SC_dt[, n_CURRENT_ENERGY_EFFICIENCY := ifelse( CURRENT_ENERGY_EFFICIENCY>100 ,101, CURRENT_ENERGY_EFFICIENCY)]
+combi_SC_dt[, n_POTENTIAL_ENERGY_EFFICIENCY := ifelse( POTENTIAL_ENERGY_EFFICIENCY>100 ,101, POTENTIAL_ENERGY_EFFICIENCY)]
+
+#Edit 2: EIC values over 100 are set to 101
+combi_SC_dt[, n_ENVIRONMENT_IMPACT_CURRENT := ifelse( ENVIRONMENT_IMPACT_CURRENT>100 ,101, ENVIRONMENT_IMPACT_CURRENT)]
+combi_SC_dt[, n_ENVIRONMENT_IMPACT_POTENTIAL := ifelse( ENVIRONMENT_IMPACT_POTENTIAL>100 ,101, ENVIRONMENT_IMPACT_POTENTIAL)]
+
+
+#Edited Variable 1: Potential Change PEE 
+combi_SC_dt[, nn_potEE := n_POTENTIAL_ENERGY_EFFICIENCY - n_CURRENT_ENERGY_EFFICIENCY]
+#Edited Variable 2: Potential Change EIP 
+combi_SC_dt[, nn_potIE := n_ENVIRONMENT_IMPACT_POTENTIAL - n_ENVIRONMENT_IMPACT_CURRENT]
+```
+
+
+```{r EE & EI create_Ratings}
+#Edit 8: Difference in CEE & CEI
+#note: the CURRENT_ENERGY_RATING  includes A+ and 0 ratings, that are marked as 'INVALID!' 
+combi_SC_dt[ , nn_CEE_rating := cut(CURRENT_ENERGY_EFFICIENCY,
+                            breaks = c(rev(lettermapping$cutoff), Inf),
+                            right = F, #includes the lower value
+                            labels=  rev(lettermapping$letter)) ]
+
+combi_SC_dt[ , nn_CEI_rating := cut(ENVIRONMENT_IMPACT_CURRENT,
+                            breaks = c(rev(lettermapping$cutoff), Inf),
+                            right = F, #includes the lower value
+                            labels=  rev(lettermapping$letter)) ]
+```
+
+
+```{r EE & EI C-relative}
+#N2: create CEE relative column
+fctr_levels <- c("C+","C","C-")
+
+#Grouped CEE
+combi_SC_dt[ , n_CEErel:= ifelse(CURRENT_ENERGY_RATING == 'C', 'C', 
+                                       ifelse(CURRENT_ENERGY_RATING %in% c('A', 'B'), 'C+', 
+                                              ifelse(CURRENT_ENERGY_RATING %in% c('D', 'E','F','G'),'C-','NA' )))]
+combi_SC_dt[n_CEErel =="NA", n_Crel:= ifelse(CURRENT_ENERGY_EFFICIENCY > 100, 'C+', 'C-')]
+combi_SC_dt[ ,n_CEErel := factor(n_CEErel, levels = fctr_levels, ordered = T)]
+
+
+#Grouped CEI
+combi_SC_dt[, nn_CEIrel:= ifelse(nn_CEI_rating == 'C', 'C', 
+                                       ifelse(nn_CEI_rating %in% c('A', 'B'), 'C+', 
+                                              ifelse(nn_CEI_rating %in% c('D', 'E','F','G'),'C-','NA' )))]
+combi_SC_dt[nn_CEIrel =="NA", n_Crel:= ifelse( nn_CEI_rating > 100, 'C+', 'C-')]
+combi_SC_dt[,n_CEIrel := factor(n_CEErel, levels = fctr_levels, ordered = T)]
+```
+
+```{r EE & EI CEE_CEI_variable}
+
+combi_SC_dt[ , nn_letter_Diff_CEE_EIC := ifelse(nn_CEE_rating == nn_CEI_rating, 'same letter rate', 
+                                                         ifelse(CURRENT_ENERGY_EFFICIENCY > ENVIRONMENT_IMPACT_CURRENT, 'Better Running', 'Less C02') ) ]
+```
+
+
+
+# Edits to Rooms
+```{r rooms}
+##Formatting Rooms:
+combi_SC_dt[, NUMBER_HABITABLE_ROOMS:=as.integer(NUMBER_HABITABLE_ROOMS)]
+combi_SC_dt[, NUMBER_HEATED_ROOMS:=as.integer(NUMBER_HEATED_ROOMS)]
+
+# #View(combi_SC_dt[, .(n = .N) ,by=NUMBER_HABITABLE_ROOMS ])
+# #View(combi_SC_dt[, .(n = .N) ,by=NUMBER_HEATED_ROOMS ])
+# round(quantile(combi_SC_dt$NUMBER_HABITABLE_ROOMS, 0.99, na.rm = T),0) # 10
+# round(quantile(combi_SC_dt$NUMBER_HEATED_ROOMS, 0.99, na.rm = T),0) # 9
+
+
+#Edit 3: Places with over 7 habitable rooms are grouped together into 7+
+fctr_levels <- c(paste0(seq(1,9,1), 'HaR'), '+10HaR' )
+combi_SC_dt[ , n_habitable_rooms_grp := ifelse( NUMBER_HABITABLE_ROOMS>9,'+10HaR', paste0(NUMBER_HABITABLE_ROOMS,'HaR'))]
+combi_SC_dt[ , n_habitable_rooms_grp := factor(n_habitable_rooms_grp, levels = fctr_levels, ordered = T)]
+
+#Edit 4: Places with over 9 heated rooms are grouped together into 8+
+fctr_levels <- c(paste0(seq(1,8,1), 'HtR'), '+9HtR' )
+combi_SC_dt[ , n_heated_rooms_grp := ifelse( NUMBER_HEATED_ROOMS>8,'+9HtR', paste0(NUMBER_HEATED_ROOMS,'HtR'))]
+combi_SC_dt[ , n_heated_rooms_grp := factor(n_heated_rooms_grp, levels = fctr_levels, ordered = T)]
+
+
+```
+
+# Edits to Area
+```{r floorarea}
+combi_SC_dt[, TOTAL_FLOOR_AREA:=as.integer(TOTAL_FLOOR_AREA)]
+
+round(quantile(combi_SC_dt$TOTAL_FLOOR_AREA, 0.99, na.rm = T),0) #max:276m2
+round(quantile(combi_SC_dt$TOTAL_FLOOR_AREA, 0.01, na.rm = T),0) #min:25m2
+
+#Edit 5: Floor Area. 
+#Note min bedroom size is 6.5m2 = 7m2
+#Max is 276, based on the 99 percentile of the entries
+maxthreshold <- round(quantile(combi_SC_dt$TOTAL_FLOOR_AREA, 0.99, na.rm = T),0) 
+print(paste('The 99 percentile of floor area is: ', maxthreshold, 'm2'))
+combi_SC_dt[, n_TOTAL_FLOOR_AREA  := ifelse( TOTAL_FLOOR_AREA < 6 ,6, TOTAL_FLOOR_AREA)]
+combi_SC_dt[, n_TOTAL_FLOOR_AREA  := ifelse( n_TOTAL_FLOOR_AREA > maxthreshold , maxthreshold+1, n_TOTAL_FLOOR_AREA)]
+
+```
+
+
+Tenure, Built form, Age & Transaction
+#Editing Variables should be done in the excel sheets!
+```{r change_col_based_on_LUTs}
+#Editing Variables should be done in the excel sheets!
+#get loopUp
+LUT_TENURE <- read_excel("../Data/OS-N_EPC_v10_LUT+dictionaries.xlsx", sheet = "TENURE",range = cell_cols("B:C"))
+LUT_PROPERTY_TYPE <- read_excel("../Data/OS-N_EPC_v10_LUT+dictionaries.xlsx", sheet = "PROPERTY_TYPE",range = cell_cols("B:C"))
+LUT_TRANSACTION_TYPE <- read_excel("../Data/OS-N_EPC_v10_LUT+dictionaries.xlsx", sheet = "TRANSACTION_TYPE",range = cell_cols("B:C"))
+
+
+#TENURE
+LUT_colum <- LUT_TENURE[match(combi_SC_dt$TENURE, LUT_TENURE$TENUREfactors),"harmonisation"]
+combi_SC_dt[,n_tenure := LUT_colum]
+combi_SC_dt[is.na(n_tenure),n_tenure := 'unknown'] #deals with NAs
+fct <- c('owner-occupied','rental (private)','rental (social)','unknown')
+combi_SC_dt[,n_tenure := factor(n_tenure, levels = fct, ordered = T)]
+
+#PROPERTY_TYPE
+LUT_colum <- LUT_PROPERTY_TYPE[match(combi_SC_dt$PROPERTY_TYPE, LUT_PROPERTY_TYPE$PROPERTY_TYPEfactors),"harmonisation"]
+combi_SC_dt[,n_propTyp := LUT_colum]
+combi_SC_dt[is.na(n_propTyp),n_propTyp := 'unknown'] 
+fct <- c('Flat','House','Bungalow')
+combi_SC_dt[,n_propTyp := factor(n_propTyp, levels = fct, ordered = T)]
+
+#TRANSACTION_TYPE
+LUT_colum <- LUT_TRANSACTION_TYPE[match(combi_SC_dt$TRANSACTION_TYPE, LUT_TRANSACTION_TYPE$TRANSACTION_TYPEfactors),"harmonisation"]
+combi_SC_dt[,n_transactTyp := LUT_colum]
+combi_SC_dt[is.na(n_transactTyp),n_transactTyp := 'unknown'] 
+```
+
+```{r builtform}
+#N: create new Built Form column
+#Old levels: "unknown","End-Terrace","Detached","Mid-Terrace", "Semi-Detached"
+LUT_BUILT_FORM <- read_excel("../Data/OS-N_EPC_v10_LUT+dictionaries.xlsx", sheet = "BUILT_FORM",range = cell_cols("B:D"))
+LUT_colum <- LUT_BUILT_FORM[match(combi_SC_dt$BUILT_FORM, LUT_BUILT_FORM$BUILT_FORMfactors),"harmonisation_det"]
+combi_SC_dt[,n_builtForm := LUT_colum]
+combi_SC_dt[is.na(n_builtForm),n_builtForm := 'unknown'] 
+fct_n_builtForm <- c('Detached','Semi-Detached','End-Terrace','Mid-Terrace','unknown')
+combi_SC_dt[,n_builtForm := factor(n_builtForm, levels = fct_n_builtForm, ordered = T)]
+
+
+LUT_colum <- LUT_BUILT_FORM[match(combi_SC_dt$BUILT_FORM, LUT_BUILT_FORM$BUILT_FORMfactors),"harmonisation"]
+combi_SC_dt[,nn_builtForm := LUT_colum]
+combi_SC_dt[is.na(nn_builtForm),nn_builtForm := 'unknown'] 
+fct_n_builtForm <- c('Detached','Semi-Detached','Terrace','unknown')
+combi_SC_dt[,n_builtForm := factor(nn_builtForm, levels = fct, ordered = T)]
+
+#View( combi_SC_dt[,.(n= .N), by = n_builtForm])
+#View( combi_SC_dt[,.(n= .N), by = nn_builtForm])
+```
+
+
+```{r age band}
+#AGE_BAND
+#age from 2007 is ambigious
+LUT_AGE_BAND <- read_excel("../Data/OS-N_EPC_v10_LUT+dictionaries.xlsx", sheet = "CONSTRUCTION_AGE_BAND",range = cell_cols("B:D"))
+LUT_colum <- LUT_AGE_BAND[match(combi_SC_dt$CONSTRUCTION_AGE_BAND, LUT_AGE_BAND$CONSTRUCTION_AGE_BANDfactors), "harmonisation_det"]
+combi_SC_dt[,n_construction_age_band := LUT_colum]
+combi_SC_dt[is.na(n_construction_age_band),n_construction_age_band := 'unknown'] #deals with NAs
+fct <- c("Pre-1900","1900-1929","1930-1949","1950-1966","1967-1975","1976-1982","1983-1990","1991-1995","1996-2002","2003-2006",
+         "2007-2011","unknown","2007 onwards","2012 onwards")
+combi_SC_dt[,n_construction_age_band := factor(n_construction_age_band, levels = fct, ordered = T)]
+
+
+LUT_colum <- LUT_AGE_BAND[match(combi_SC_dt$CONSTRUCTION_AGE_BAND, LUT_AGE_BAND$CONSTRUCTION_AGE_BANDfactors),"harmonisation"]
+combi_SC_dt[,nn_construction_age_band := LUT_colum]
+combi_SC_dt[is.na(nn_construction_age_band),nn_construction_age_band := 'unknown'] #deals with NAs
+fct <- c("Pre-1900","1900-1929","1930-1949","1950-1966","1967-1975","1976-1982","1983-1990","1991-1995","1996-2002","2003-2006","2007 onwards","unknown")
+combi_SC_dt[,nn_construction_age_band := factor(nn_construction_age_band, levels = fct, ordered = T)]
+
+View(combi_SC_dt[, .(n = .N) ,by=n_construction_age_band ])
+View(combi_SC_dt[, .(n = .N) ,by=nn_construction_age_band ])
+```
+
+
+
+
+```{r attach_ONS_geo}
+rm(additional_dt)
+#Load and shrink ONS Geography
 ONSUD_dt <- loadRData( "../Data/RData_crossSectional/big_crossSect_EPCs_cleaned_additional_ONSUD_dt16M293951.RData") 
+ONSUD_cols <- read_csv("../Data/RData_crossSectional/ONSUD_cols.csv")
+ONSUD_cols <- ONSUD_cols$cols[!is.na(ONSUD_cols$b_use)] 
+ONSUD_dt <- ONSUD_dt[,ONSUD_cols , with = F]
+
+combi_SC_dt <-merge(combi_SC_dt, ONSUD_dt, by = 'LMK_KEY', all = TRUE)
+rm(ONSUD_dt)
+```
 
 
+
+
+```{r}
+big_SC_dt <- combi_SC_dt[, c("LMK_KEY","lsoa11cd") ,with = F]
+#multiple deprivation EW
+#IMD19<- read.dbf("../Data/_shapefiles/Lower_Super_Output_Area_(LSOA)_IMD_2019__(OSGB1936)/Lower_Super_Output_Area_(LSOA)_IMD_2019__(OSGB1936).dbf")
+#big_SC_dt[IMD19,  on = 'lsoa11cd', c('n_IMDRank_EW','n_IMDDecil_EW') := .(IMDRank,IMDDecil)]
+```
+
+
+
+```{r attach_IMDs}
 #income deprivation E
 income_imd2019lsoa_E <- fread("../Data/imd2019lsoa/imd2019lsoa.csv",
                      drop="Units", #empty column anyway
@@ -34,148 +278,41 @@ income_imd2019lsoa_E <- fread("../Data/imd2019lsoa/imd2019lsoa.csv",
 #Measurements are: "Rank"   "Decile" "Score"
 #income_imd2019lsoa_E <- setNames(income_imd2019lsoa_E, c("lsoa11cd","Date","Measurement","Value","Indices of Deprivation") )
 setnames(income_imd2019lsoa_E, c("FeatureCode"), c("lsoa11cd"))
-```
-
-Tenure, Built form, Age & Transaction
-```{r change_col_based_on_LUTs}
-#get loopUp
-LUT_tenure <- read_excel("../Data/OS-N_EPC_v10_LUT+dictionaries.xlsx", sheet = "TENURE",range = cell_cols("B:C"))
-LUT_builtForm <- read_excel("../Data/OS-N_EPC_v10_LUT+dictionaries.xlsx", sheet = "BUILT_FORM",range = cell_cols("B:C"))
-#LUT_age_band <- entries_to_factors(column_to_extract_factors_from = "CONSTRUCTION_AGE_BAND")
-#LUT_transaction <- entries_to_factors(column_to_extract_factors_from = "TRANSACTION_TYPE")
+#income_imd2019lsoa_E[ , by = `Indices of Deprivation`, .N ]
 
 
-#N: create new Tenure column
-LUT_colum <- LUT_tenure[match(big_Dt_CSsubset_N6M7$TENURE, LUT_tenure$tenure_factors),"harmonisation"]
-big_Dt_CSsubset_N6M7[,n_tenure := LUT_colum]
-big_Dt_CSsubset_N6M7[is.na(n_tenure),n_tenure := 'unknown'] #deals with NAs
-
-#N: create new Built Form column
-LUT_colum <- LUT_builtForm[match(big_Dt_CSsubset_N6M7$BUILT_FORM, LUT_builtForm$BUILT_FORMfactors),"harmonisation"]
-big_Dt_CSsubset_N6M7[,n_builtForm := LUT_colum]
-big_Dt_CSsubset_N6M7[is.na(n_builtForm),n_builtForm := 'unknown'] 
-
-#Combine age bands in 2007 onwards
-
-
-
-#Edited Variable 3: Combine all terraced housing
-#Old levels: "unknown","End-Terrace","Detached","Mid-Terrace", "Semi-Detached"
-big_Dt_CSsubset_N6M7[, nn_builtForm := n_builtForm]
-levels(big_Dt_CSsubset_N6M7$nn_builtForm)[levels(big_Dt_CSsubset_N6M7$nn_builtForm)=='End-Terrace'] <- 'Terrace'
-levels(big_Dt_CSsubset_N6M7$nn_builtForm)[levels(big_Dt_CSsubset_N6M7$nn_builtForm)=='Mid-Terrace'] <- 'Terrace'
-```
-
-
-# EE & EI
-
-```{r Crel}
-#Edit 1: CEE values over 100 are set to 101
-#round(quantile(big_Dt_CSsubset_N6M7$CURRENT_ENERGY_EFFICIENCY, 0.99, na.rm = T),0) # 87
-big_Dt_CSsubset_N6M7[, n_CURRENT_ENERGY_EFFICIENCY := ifelse( CURRENT_ENERGY_EFFICIENCY>100 ,101, CURRENT_ENERGY_EFFICIENCY)]
-# round(quantile(big_Dt_CSsubset_N6M7$POTENTIAL_ENERGY_EFFICIENCY, 0.99, na.rm = T),0) # 97
-big_Dt_CSsubset_N6M7[, n_POTENTIAL_ENERGY_EFFICIENCY := ifelse( POTENTIAL_ENERGY_EFFICIENCY>100 ,101, POTENTIAL_ENERGY_EFFICIENCY)]
-
-#Edit 2: EIC values over 100 are set to 101
-# round(quantile(big_Dt_CSsubset_N6M7$ENVIRONMENT_IMPACT_CURRENT, 0.99, na.rm = T),0) # 92
-big_Dt_CSsubset_N6M7[, n_ENVIRONMENT_IMPACT_CURRENT := ifelse( ENVIRONMENT_IMPACT_CURRENT>100 ,101, ENVIRONMENT_IMPACT_CURRENT)]
-#round(quantile(big_Dt_CSsubset_N6M7$ENVIRONMENT_IMPACT_POTENTIAL, 0.99, na.rm = T),0) # 99
-big_Dt_CSsubset_N6M7[, n_ENVIRONMENT_IMPACT_POTENTIAL := ifelse( ENVIRONMENT_IMPACT_POTENTIAL>100 ,101, ENVIRONMENT_IMPACT_POTENTIAL)]
-
-
-#Edited Variable 1: Potential Change PEE 
-big_Dt_CSsubset_N6M7[, nn_potEE := n_POTENTIAL_ENERGY_EFFICIENCY - n_CURRENT_ENERGY_EFFICIENCY]
-#Edited Variable 2: Potential Change EIP 
-big_Dt_CSsubset_N6M7[, nn_potIE := n_ENVIRONMENT_IMPACT_POTENTIAL - n_ENVIRONMENT_IMPACT_CURRENT]
-
-
-
-#N2: create C relative column
-big_Dt_CSsubset_N6M7[, n_Crel:= ifelse(CURRENT_ENERGY_RATING == 'C', 'C', 
-                                       ifelse(CURRENT_ENERGY_RATING %in% c('A', 'B'), 'C+', 
-                                              ifelse(CURRENT_ENERGY_RATING %in% c('D', 'E','F','G'),'C-','NA' )))]
-#big_Dt_CSsubset_N6M7[CURRENT_ENERGY_RATING =="INVALID!", ]$CURRENT_ENERGY_EFFICIENCY
-big_Dt_CSsubset_N6M7[n_Crel =="NA", n_Crel:= ifelse(CURRENT_ENERGY_EFFICIENCY > 100, 'C+', 'C-')]
-  
-
-
-#Formatting n_Crel:
-fctr_levels <- c("C+","C","C-")
-big_Dt_CSsubset_N6M7[,n_Crel := factor(n_Crel, levels = fctr_levels, ordered = T)]
-```
-
-```{r CEE_CEI_variable}
-#Edit 8: Difference in CEE & CEI
-big_Dt_CSsubset_N6M7[ , nn_CEE_rating := cut(CURRENT_ENERGY_EFFICIENCY,
-                            breaks = c(rev(lettermapping$cutoff), Inf),
-                            right = F, #includes the lower value
-                            labels=  rev(lettermapping$letter)) ]
-
-big_Dt_CSsubset_N6M7[ , nn_CEI_rating := cut(ENVIRONMENT_IMPACT_CURRENT,
-                            breaks = c(rev(lettermapping$cutoff), Inf),
-                            right = F, #includes the lower value
-                            labels=  rev(lettermapping$letter)) ]
-
-big_Dt_CSsubset_N6M7[ , nn_letter_Diff_CEE_EIC := ifelse(nn_CEE_rating == nn_CEI_rating, 'same letter rate', 
-                                                         ifelse(CURRENT_ENERGY_EFFICIENCY > ENVIRONMENT_IMPACT_CURRENT, 'Better Running', 'Less C02') ) ]
-```
-
-
-
-```{r rooms}
-#Formatting NUMBER_HABITABLE_ROOMS:
-#tally <- big_Dt_CSsubset_N6M7[, .(n = .N) ,by=NUMBER_HABITABLE_ROOMS ]
-big_Dt_CSsubset_N6M7[, NUMBER_HABITABLE_ROOMS:=as.integer(NUMBER_HABITABLE_ROOMS)]
-
-#Edit 3: Places with over 7 habitable rooms are grouped together into 7+
-#round(quantile(big_Dt_CSsubset_N6M7$NUMBER_HABITABLE_ROOMS, 0.99, na.rm = T),0) # is 10
-fctr_levels <- c(paste0(seq(1,9,1), 'HaR'), '+10HaR' )
-big_Dt_CSsubset_N6M7[ , n_habitable_rooms_grp := ifelse( NUMBER_HABITABLE_ROOMS>9,'+10HaR', paste0(NUMBER_HABITABLE_ROOMS,'HaR'))]
-big_Dt_CSsubset_N6M7[ , n_habitable_rooms_grp := factor(n_habitable_rooms_grp, levels = fctr_levels, ordered = T)]
-
-#Edit 4: Places with over 9 heated rooms are grouped together into 8+
-#round(quantile(big_Dt_CSsubset_N6M7$NUMBER_HEATED_ROOMS, 0.99, na.rm = T),0) # is 9
-fctr_levels <- c(paste0(seq(1,8,1), 'HtR'), '+9HtR' )
-big_Dt_CSsubset_N6M7[ , n_heated_rooms_grp := ifelse( NUMBER_HEATED_ROOMS>8,'+9HtR', paste0(NUMBER_HEATED_ROOMS,'HtR'))]
-big_Dt_CSsubset_N6M7[ , n_heated_rooms_grp := factor(n_heated_rooms_grp, levels = fctr_levels, ordered = T)]
-
-#Edit 5: Floor Area. 
-#Note min bedroom size is 6.5m2 = 7m2
-#Max is 270, based on the 99 percentile of the entries
-maxthreshold <- round(quantile(big_Dt_CSsubset_N6M7$TOTAL_FLOOR_AREA, 0.99, na.rm = T),0) # 270
-#min: round(quantile(big_Dt_CSsubset_N6M7$TOTAL_FLOOR_AREA, 0.01, na.rm = T),0), 27m2 
-print(paste('The 99 percentile of floor area is: ', maxthreshold, 'm2'))
-big_Dt_CSsubset_N6M7[, n_TOTAL_FLOOR_AREA  := ifelse( TOTAL_FLOOR_AREA < 6 ,6, TOTAL_FLOOR_AREA)]
-big_Dt_CSsubset_N6M7[, n_TOTAL_FLOOR_AREA  := ifelse( n_TOTAL_FLOOR_AREA > maxthreshold , maxthreshold+1, n_TOTAL_FLOOR_AREA)]
-```
-
-```{r attach_IMDs}
-##ATTACH DATA 
-big_Dt_CSsubset_N6M7[IMD19,  on = 'lsoa11cd', c('n_IMDRank','n_IMDDecil') := .(IMDRank,IMDDecil)]
 
 #Add IoD
 ##can select other IoD here
 #b.income
 imd_bincome <-  income_imd2019lsoa_E[ `Indices of Deprivation` == "b. Income Deprivation Domain",]
 imd_bincome <-dcast(imd_bincome, lsoa11cd ~ Measurement, value.var = c("Value"))
-big_Dt_CSsubset_N6M7[imd_bincome,  on = 'lsoa11cd', c('n_bIoDRank_income','n_bIoDDecil_income') := .(Rank,Decile)]
-#g.barriers
-imd_gbarriers <-  income_imd2019lsoa_E[ `Indices of Deprivation` == "g. Barriers to Housing and Services Domain",]
-imd_gbarriers <-dcast(imd_gbarriers, lsoa11cd ~ Measurement, value.var = c("Value"))
-big_Dt_CSsubset_N6M7[imd_gbarriers,  on = 'lsoa11cd', c('n_gIoDRank_barriers','n_gIoDDecil_barriers') := .(Rank,Decile)]
-
-#Edit 6: Make Income deprivation groups (b.)
-big_Dt_CSsubset_N6M7[ , n_bIoDDecil_income_grp := cut(n_bIoDDecil_income,
+big_SC_dt[imd_bincome,  on = 'lsoa11cd', c('n_bIoDRank_income','n_bIoDDecil_income') := .(Rank,Decile)]
+#Make barriers deprivation groups
+big_SC_dt[ , n_bIoDDecil_income_grp := cut(n_bIoDDecil_income,
                             breaks = c(0, 3, 7, Inf),
                             include.lowest= TRUE, labels=c('IncomeDeprived_1-3','AverageIncome_4-7','IncomeUnDeprived_8-10'))]
 
-#Edit 6: Make barriers deprivation groups (g.)
-big_Dt_CSsubset_N6M7[ , n_gIoDDecil_housing_grp := cut(n_gIoDDecil_barriers,
+
+#g. Barriers to Housing and Services
+imd_gbarriers <-  income_imd2019lsoa_E[ `Indices of Deprivation` == "g. Barriers to Housing and Services Domain",]
+imd_gbarriers <-dcast(imd_gbarriers, lsoa11cd ~ Measurement, value.var = c("Value"))
+combi_SC_dt[imd_gbarriers,  on = 'lsoa11cd', c('n_gIoDRank_barriers','n_gIoDDecil_barriers') := .(Rank,Decile)]
+#Make barriers deprivation groups
+combi_SC_dt[ , n_gIoDDecil_housing_grp := cut(n_gIoDDecil_barriers,
                             breaks = c(0, 3, 7, Inf),
                             include.lowest= TRUE, labels=c('H&S_Deprived_1-3','AverageAccess_4-7','H&S_UnDeprived_8-10'))]
+
+
+#i. Income Deprivation Affecting Children Index (IDACI)
+imd_iChildren <-  income_imd2019lsoa_E[ `Indices of Deprivation` == "i. Income Deprivation Affecting Children Index (IDACI)",]
+imd_iChildren <-dcast(imd_iChildren, lsoa11cd ~ Measurement, value.var = c("Value"))
+combi_SC_dt[imd_iChildren,  on = 'lsoa11cd', c('n_iIoDRank_barriers','n_iIoDDecil_barriers') := .(Rank,Decile)]
+#Make barriers deprivation groups
+combi_SC_dt[ , n_iIoDDecil_housing_grp := cut(n_iIoDDecil_barriers,
+                            breaks = c(0, 3, 7, Inf),
+                            include.lowest= TRUE, labels=c('Deprived_Child_1-3','Average.C.Income_4-7','UnDeprived_Child_8-10'))]
 ```
-
-
 
 
 

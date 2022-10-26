@@ -15,6 +15,53 @@ write.csv(cleanup, "C:\\Users\\bonni\\Dropbox\\_PhD\\Application Documents\\CASA
 ##title: "CS_P3"
 
 
+
+"TENURE", "BUILT_FORM",
+"CURRENT_ENERGY_EFFICIENCY","POTENTIAL_ENERGY_EFFICIENCY"
+"ENVIRONMENT_IMPACT_CURRENT","ENVIRONMENT_IMPACT_POTENTIAL",
+
+"NUMBER_HABITABLE_ROOMS","NUMBER_HEATED_ROOMS"
+"TOTAL_FLOOR_AREA"
+
+"CONSTRUCTION_AGE_BAND","TRANSACTION_TYPE"
+
+
+
+
+Drop:
+combi_SC_dt[ CURRENT_ENERGY_RATING != 'INVALID!']
+
+
+```{r}
+library(stringdist)
+
+```
+
+```{r}
+new_vars <- grep('n_', names(combi_SC_dt), value = T)
+wip_vars <- c('CURRENT_ENERGY_EFFICIENCY','ENVIRONMENT_IMPACT_CURRENT',
+              'POTENTIAL_ENERGY_EFFICIENCY', 'POTENTIAL_ENERGY_EFFICIENCY',
+              'CURRENT_ENERGY_RATING')
+
+
+wip_vars <- c('CURRENT_ENERGY_EFFICIENCY','ENVIRONMENT_IMPACT_CURRENT',
+              'POTENTIAL_ENERGY_EFFICIENCY', 'POTENTIAL_ENERGY_EFFICIENCY',
+              'CURRENT_ENERGY_RATING')
+
+intersect( names(combi_SC_dt) , c(new_vars,wip_vars) )
+View(head(combi_SC_dt[ , c(new_vars,wip_vars) , with = FALSE] ))
+
+
+checkers <- c('CURRENT_ENERGY_EFFICIENCY','CURRENT_ENERGY_RATING',
+              'nn_CEE_rating','n_CEErel',
+              'ENVIRONMENT_IMPACT_CURRENT', 
+              'nn_CEI_rating','nn_CEIrel',
+              'nn_letter_Diff_CEE_EIC')
+
+View(head(combi_SC_dt[ , c(checkers) , with = FALSE], 300 ))
+```
+
+##DELETE
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, cache.lazy = FALSE)
 # library(dplyr)
@@ -33,9 +80,7 @@ source("../Outputs/Thesis_custom_scripts.R", local = knitr::knit_global())
 
 
 
-#formatting:
-lettermapping <-  data.frame( letter = c('A','B','C','D','E','F','G'), 
-                              cutoff = c(92, 81, 69, 55, 39, 21, 0))
+
 
 EDA_cols <- read_csv("../Data/EDA_colour_scheme.csv")
 #EDA_cols <- subset(EDA_cols[EDA_cols$geography_name %in%  cross_data, ])
@@ -63,12 +108,6 @@ LUT_builtForm <- read_excel("../Data/OS-N_EPC_v10_LUT+dictionaries.xlsx", sheet 
 #LUT_age_band <- entries_to_factors(column_to_extract_factors_from = "CONSTRUCTION_AGE_BAND")
 #LUT_transaction <- entries_to_factors(column_to_extract_factors_from = "TRANSACTION_TYPE")
 ```
-
-
-
-
-
-
 
 
 ```{r UPRN_match_colums}
@@ -101,6 +140,8 @@ big_Dt_CSsubset_N6M7[, NUMBER_HABITABLE_ROOMS:=as.integer(NUMBER_HABITABLE_ROOMS
 
 
 ```{r attach_IMDs}
+
+big_Dt_CSsubset_N6M7 <- head(combi_SC_dt)
 ##ATTACH DATA 
 big_Dt_CSsubset_N6M7[IMD19,  on = 'lsoa11cd', c('n_IMDRank','n_IMDDecil') := .(IMDRank,IMDDecil)]
 
@@ -196,105 +237,12 @@ levels(big_Dt_CSsubset_N6M7$nn_builtForm)[levels(big_Dt_CSsubset_N6M7$nn_builtFo
 
 
 
-```{r CSSubset}
-#bonus task: add CO2_EMISSIONS_CURRENT from raw
-big_Dt_CSsubset_N6M7
-#N = 16 744 771, ncol = 56
-names(big_Dt_CSsubset_N6M7)
-```
-```{r naChecks}
-if(F){
-#there are no missing values 
-nas <- which(is.na(big_Dt_CSsubset_N16M7$CURRENT_ENERGY_EFFICIENCY))
-nas <- which(is.na(big_Dt_CSsubset_N16M7$POTENTIAL_ENERGY_EFFICIENCY))
-nas <- which(is.na(big_Dt_CSsubset_N16M7$n_potEE))
-
-nas <- which(is.na(big_Dt_CSsubset_N16M7$ENVIRONMENT_IMPACT_CURRENT))
-nas <- which(is.na(big_Dt_CSsubset_N16M7$ENVIRONMENT_IMPACT_POTENTIAL))
-nas <- which(is.na(big_Dt_CSsubset_N16M7$n_potEIC)) 
-
-#contains nas!
-nas <- which(is.na(big_Dt_CSsubset_N16M7$TOTAL_FLOOR_AREA)) 
-}
-```
-
-
-```{r}
-#anki order vs setorder # https://stackoverflow.com/questions/13685295/sort-a-data-table-fast-by-ascending-descending-order
-
-#big_Dt_CSsubset_N6M7 <- big_Dt_CSsubset_N6M7[order(n_UPRN, -rank(INSPECTION_DATE) ),]
-setorder(big_Dt_CSsubset_N6M7, n_UPRN, -INSPECTION_DATE) 
-
-
-head(big_Dt_CSsubset_N6M7[duplicated(n_UPRN)])
-sum(duplicated(big_Dt_CSsubset_N6M7$n_UPRN))#909 529
-
-dupsrm <- big_Dt_CSsubset_N6M7[!duplicated(big_Dt_CSsubset_N6M7$n_UPRN)]
-
-```
-
-
-```{r NS_dt_censorship}
-#Unexplained high values
-NS_dt <- dupsrm[ n_CURRENT_ENERGY_EFFICIENCY < 101,] # drops = 3 094 
-NS_dt <- NS_dt[ n_ENVIRONMENT_IMPACT_POTENTIAL < 101,] # drops a further = 92 699
-
-NS_dt[, n_CURRENT_ENERGY_EFFICIENCY := NULL]
-NS_dt[, n_ENVIRONMENT_IMPACT_POTENTIAL := NULL]
-
-maxthreshold <- round(quantile(dupsrm$TOTAL_FLOOR_AREA, 0.99, na.rm = T),0) 
-minthreshold <- round(quantile(dupsrm$TOTAL_FLOOR_AREA, 0.01, na.rm = T),0) 
-
-NS_dt <- NS_dt[ minthreshold < NS_dt$TOTAL_FLOOR_AREA,] # drops a further ~ 167 731 
-NS_dt <- NS_dt[ maxthreshold > NS_dt$TOTAL_FLOOR_AREA,] # drops a further ~ 166 758
-NS_dt[, n_TOTAL_FLOOR_AREA := NULL]
-NS_dt <- NS_dt[ !is.na(TOTAL_FLOOR_AREA),] # checks 
-
-#cannot explain, so removed
-NS_dt <- NS_dt[ n_construction_age_band != 'unknown',] # drops 208 708
-
-sample <- lengths(NS_dt )[1] # 16 440 270 
-sample
-
-#save( NS_dt , file = "../Outputs/WIP_crossSectional/NS_subset_N16m111443.RData")
-
-
-
-#NS_dt[ order( )]
-#had dups issue
-#save( NS_dt , file = "../Outputs/WIP_crossSectional/NS_subset_N16m440270.RData")
-```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 #####################################################
 #####################################################
+```{r releveling cheats}
+#levels(big_Dt_CSsubset_N6M7$nn_builtForm)[levels(big_Dt_CSsubset_N6M7$nn_builtForm)=='Mid-Terrace'] <- 'Terrace'
+```
 
 
 ```{r checker_big_crossSect_EPCs_cleaned_N16m984358}

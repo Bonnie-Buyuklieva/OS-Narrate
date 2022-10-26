@@ -40,6 +40,10 @@ Exclusions:
 Unknown:
 - Built form
 - Age unknown
+- 100 > EE & EEI > 0 [to fit into A - E], drops 'INVALID'. Then drop either nn_CEE_rating or CURRENT_ENERGY_RATING as these are the same. 
+
+- NUMBER_HABITABLE_ROOMS is NA or zero (loses 2M3 entries)
+- remove 1% of floor area, which is 276 m2  (loses 168 792 entries)
 
 To small to count:
 - Park homes
@@ -48,7 +52,7 @@ Combined:
 - Terrace (Mid;End;Enclosed Mid & Enclosed End)
 
 
-```{r naChecks}
+```{r naChecks}b_use
 if(F){
 #there are no missing values 
 nas <- which(is.na(big_Dt_CSsubset_N16M7$CURRENT_ENERGY_EFFICIENCY))
