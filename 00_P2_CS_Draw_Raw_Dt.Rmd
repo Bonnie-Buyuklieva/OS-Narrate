@@ -1,0 +1,114 @@
+---
+title: "CS_P2_Get_Raw_Data"
+author: "Boyana Buyuklieva"
+date: "September 7, 2022"
+output: html_document
+---
+
+
+#rename the file to be ONSUD_and_additional_raw_dt
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(tidyverse)
+library(data.table)
+library(readxl)
+library(readr)
+
+#loads:loadRData() ; get_column_from_raw_data()
+source("../Outputs/Thesis_custom_scripts.R", local = knitr::knit_global())
+
+#get folders. cross_data is regions
+LAD_region_LUT <- read_excel("../Data/LAD_region_LUT.xlsx")
+folders <-  LAD_region_LUT$folder_name
+
+big_SC_dt<- loadRData( paste0("../Data/RData_crossSectional/big_crossSect_EPCs_cleaned_N16m984358.RData") )
+setkey(big_SC_dt, LMK_KEY)
+```
+
+```{r}
+#Check number of URPNs per LSOA in the ONS data set
+#ensure no URPNs are duplicated
+```
+
+
+
+```{r get_one_column_from_raw_data}
+#takes 40 mins per column
+CONSTRUCTION_AGE_BAND <- get_column_from_raw_data(big_dt_with_LMK_KEY = big_SC_dt , EPC_LAD_folders = folders, column_to_get = "CONSTRUCTION_AGE_BAND")#40mins
+CONSTRUCTION_AGE_BAND[, by = CONSTRUCTION_AGE_BAND, .N]
+CS_LMK_KEY <- CONSTRUCTION_AGE_BAND[CS_LMK_KEY, on = "LMK_KEY"]
+
+
+TENURE <- get_column_from_raw_data(big_dt_with_LMK_KEY = big_SC_dt , EPC_LAD_folders = folders, column_to_get = "TENURE")
+TENURE[, by = TENURE, .N]
+CS_LMK_KEY <- TENURE[CS_LMK_KEY, on = "LMK_KEY"]
+```
+
+```{r add_many_columns_from_raw}
+add_cols <- c("POSTCODE","LOCAL_AUTHORITY",
+            "BUILT_FORM","PROPERTY_TYPE",
+            "CONSTRUCTION_AGE_BAND","TENURE",
+            "CURRENT_ENERGY_EFFICIENCY","POTENTIAL_ENERGY_EFFICIENCY",
+            "ENVIRONMENT_IMPACT_CURRENT","ENVIRONMENT_IMPACT_POTENTIAL",            
+            "NUMBER_HEATED_ROOMS","NUMBER_HABITABLE_ROOMS",
+            "CO2_EMISS_CURR_PER_FLOOR_AREA","TOTAL_FLOOR_AREA",
+            "EXTENSION_COUNT","TRANSACTION_TYPE",
+            "MAIN_FUEL","MAINHEAT_DESCRIPTION", "GLAZED_TYPE")
+# check I don't have these already
+add_cols <- setdiff(add_cols, names(big_SC_dt)) 
+
+#add_cols <- c("CONSTRUCTION_AGE_BAND","TENURE")
+ 
+
+
+#CS_LMK_KEY <- big_SC_dt[,list(LMK_KEY)]
+additional_dt <- setnames(data.table(matrix(nrow = 0, ncol = length(add_cols)+1)), c("LMK_KEY",add_cols) )
+start.time <- Sys.time()
+print_counter = 0
+for (LA in folders) {
+  print_counter = print_counter+1
+  if(print_counter %% 20 == 0)if(print_counter %% 20 == 0){
+    print(paste('Many cols: Done with',print_counter,'folders.','Getting column from',LA ))}
+  
+  #read all as char, then parse for error catching
+  my_colClasses <- cbind.data.frame(c("LMK_KEY",add_cols),  c( rep("character",length(add_cols)+1) )  )
+  #read as data.tables
+  suppressWarnings(certificates <- fread(paste0("../Data/all-domestic-certificates/",LA,"/certificates.csv"),
+                                         select =  c("LMK_KEY",add_cols), 
+                                         colClasses=my_colClasses))
+  setkey(certificates, LMK_KEY)
+  
+  #keep only the ones that intersect
+  certificates <- certificates[intersect(CS_LMK_KEY$LMK_KEY, certificates$LMK_KEY),]
+  additional_dt <- rbindlist(list(additional_dt,certificates))
+  
+}
+
+print(paste('loop time for two:', Sys.time() - start.time))
+#save(additional_dt, file = paste0("../Data/RData_crossSectional/big_crossSect_EPCs_cleaned_N16m984358_additional_dt.RData") )  
+```
+
+
+
+```{r adding the LMK_Key}
+#add the LMK_KEY
+CS_n_UPRN <- big_SC_dt[,list(n_UPRN, LMK_KEY)]
+setkey(CS_n_UPRN, n_UPRN)
+
+CS_n_UPRN  <- CS_n_UPRN[!is.na(n_UPRN),]
+CS_n_UPRN  <- additional_ONSUD_dt[CS_n_UPRN, on = "n_UPRN"]
+#remove all entries that were not matched to ONSUD
+CS_n_UPRN <- CS_n_UPRN[!is.na(uprn)]
+CS_n_UPRN[ , uprn_ONSUD:= uprn] # rename the col
+CS_n_UPRN[ , uprn:= NULL]
+
+View(head(CS_n_UPRN) )
+additional_ONSUD_dt_LMK_KEY <- CS_n_UPRN
+lengths(additional_ONSUD_dt_LMK_KEY)[1] #16293951 
+#save(additional_ONSUD_dt_LMK_KEY, file = paste0("../Data/RData_crossSectional/big_crossSect_EPCs_cleaned_additional_ONSUD_dt16M293951.RData") ) 
+```
+
+

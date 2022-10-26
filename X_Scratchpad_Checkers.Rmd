@@ -13,6 +13,178 @@ write.csv(cleanup, "C:\\Users\\bonni\\Dropbox\\_PhD\\Application Documents\\CASA
 
 
 
+
+```{r checker_big_crossSect_EPCs_cleaned_N16m984358}
+
+#big_SC_dt<- loadRData( paste0("../Data/RData_crossSectional/big_crossSect_EPCs_cleaned_N16m984358.RData") )
+print(paste('Number of entries without an UPRN', 
+            format(sum(is.na(big_SC_dt$n_UPRN)), big.mark = ' ')  ))
+
+print(paste('Percent of entries without an UPRN', 
+            format(round(sum(is.na(big_SC_dt$n_UPRN))/lengths(big_SC_dt)[1] *100), big.mark = ' '),'%'  ))
+
+
+
+
+#the ONS UPRNs will have some but not all UPRNs in the SC data
+#this means I will have some but not all geography info for entries in the SC data
+found = lengths(additional_ONSUD_dt[!is.na(additional_ONSUD_dt$n_UPRN),])[1] 
+print(paste('Number of UPRNs found in ONSDUF', 
+            format( found , big.mark = ' ')  ))
+
+non_na_n_UPRNs <-  lengths(big_SC_dt[!is.na(big_SC_dt$n_UPRN),])[1]
+print(paste('Percent UPRN found in ONSUD', 
+            format(round( found / non_na_n_UPRNs, 3)*100, 
+            big.mark = ' '),'%'  ))
+```
+
+
+
+
+
+
+
+
+
+```{r check_that_no_LMK-Key_is_Duped}
+setwd("C:\\Users\\bonni\\Dropbox\\_PhD\\Application Documents\\CASA RA\\RA OS NARRATE CASA\\Code")
+LMK_dups <- setnames(data.table(matrix(nrow = 0, ncol = 2) ), c('LAD','duped_LMK_KEY'))
+
+
+LA= "domestic-E07000064-Rother"
+
+ for (LA in folders) {
+  print_counter = print_counter+1
+  if(print_counter %% 20 == 0){print(LA)} 
+  
+  suppressWarnings(certificates <- fread(paste0("../Data/all-domestic-certificates/",LA,"/certificates.csv"),
+                                         select =  "LMK_KEY", 
+                                         colClasses="character"))
+  
+ if( sum(duplicated(certificates$LMK_KEY)) > 0){
+   print(paste( '!!!! Duped LMK!!!!!') 
+   }else(print('*'))
+  
+}
+```
+
+
+```{r}
+CS <- data.table(A = letters[1:10],key = "A")
+
+adt2 <- data.table(A = letters[5:12], Y = 1:8, key = "A")
+adt3 <- data.table(A = letters[2:3], Y = 1:2, key = "A")
+
+
+a <- adt2[CS, on = "A"]#first join
+a <- adt3[a, on = "A"]
+
+setnames(a, c('A','join', 'merge'))
+a[ , issue_LMK_Key_duped := ifelse( !is.na(join) & !is.na(merge), T , F)]
+a[ , join := ifelse( is.na(join), merge, join)][, merge:= NULL]
+
+
+a <- merge(adt1, adt2, all.x = T)
+a <- merge(a, adt3, all.x = T)
+
+
+
+
+
+
+
+set.seed(1)
+X <- data.table( a=letters, b=letters, c=letters, g=sample(c(1:5,7),length(letters),replace=TRUE), key="g" )
+Y <- data.table( z=runif(6), g=1:6, key="g" )
+```
+
+
+
+
+
+
+```{r places_with_no_UPRNs}
+no_UPRN <- list() 
+
+for (LA in region_LUT$folder_name) {
+#read subset only for speed:
+  readcols <- c("LMK_KEY","INSPECTION_DATE","UPRN","ADDRESS","POSTCODE",
+                "UPRN_SOURCE","CURRENT_ENERGY_RATING","CURRENT_ENERGY_EFFICIENCY",
+                "LOCAL_AUTHORITY","LOCAL_AUTHORITY_LABEL")
+  
+  #read all as char, then parse for error catching
+  my_colClasses <- cbind.data.frame(readcols,  c( rep('character',length(readcols)) )  )
+  #read as data.tables
+  certificates <- fread(paste0("../Data/all-domestic-certificates/",LA,"/certificates.csv"),
+                       select =  readcols, 
+                       colClasses=my_colClasses)
+  setkey(certificates, LMK_KEY)
+
+      col_ubdc_LUT <- ubdc_LUT[certificates$LMK_KEY, 'ubdc_uprn']
+    certificates[,ubdc_UPRN := col_ubdc_LUT]
+    
+    ##combined str dups
+    certificates[,str_concat := paste(ADDRESS, POSTCODE)]
+
+    ###make col n_UPRN where this would UPRN, 
+    certificates[ , n_UPRN := UPRN] 
+    #or take ubdc_UPRN where its missing
+    certificates[ n_UPRN == '',  n_UPRN := ubdc_UPRN]
+    
+    
+    
+    mising_UPRN <- is.na(certificates$UPRN)
+    missing_n_UPRN <- is.na(certificates$n_UPRN)
+    
+    #places that could be found in the OS DataBase. 
+    View(certificates[missing_n_UPRN])
+    
+    no_UPRN <- rbindlist(list(no_UPRN, certificates[missing_n_UPRN] ))
+}  
+```
+
+```{r assign region to unknownLAD}
+unknown_region_df<- loadRData( paste0("../Outputs/WIP_crossSectional/crossSectional_baseline_","Unknown",".RData") )
+setkey(unknown_region_df, n_UPRN)
+
+#tmp <-  unknown_region_df #head(unknown_region_df, 100)
+
+for(ONSUD in EDA_cols$ONSUD){
+  #for every ONS file, check if we can assign a region based on the UPRN data
+  start.time <- Sys.time()
+  if(is.na(ONSUD))break;  
+  ONSUD_MAY_2020 <- fread(paste0("../Data/ONSUD_MAY_2020/Data/ONSUD_MAY_2020_",ONSUD,".csv"),
+                          colClasses = c("uprn" = "character"))
+  setkey(ONSUD_MAY_2020, uprn)
+
+  unknown_region_df$uprn <- unknown_region_df$n_UPRN
+  unknown_region_df[ONSUD_MAY_2020, on = 'uprn', oa11cd := i.oa11cd]
+  unknown_region_df[ONSUD_MAY_2020, on = 'uprn', lad19cd := i.lad19cd]
+  unknown_region_df[ONSUD_MAY_2020, on = 'uprn', lsoa11cd := i.lsoa11cd]
+  unknown_region_df[ONSUD_MAY_2020, on = 'uprn', rgn17cd := i.rgn17cd]
+  #print(ONSUD)
+}
+ 
+  #merge additional raw data
+  setkey(unknown_region_df,LMK_KEY)
+  unknown_region_df <- additional_dt[unknown_region_df, on = 'LMK_KEY']
+
+print(paste('loop time:', Sys.time() - start.time))# 15 mins
+
+dt_for_assignmnet <- unknown_region_df[!is.na(lsoa11cd),]
+#8 249 of 9 794 are assigned a LSOA, using UPRNs only 
+```
+
+
+
+
+
+
+
+
+## Checking for dups
+
+
 ```{r}
 setcolorder(region_df, c("n_UPRN", setdiff(names(region_df), "n_UPRN")))
 View( region_df[duplicated(region_df$n_UPRN)][order(n_UPRN)]  ) 

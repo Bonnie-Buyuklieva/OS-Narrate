@@ -34,6 +34,9 @@ LUT_tenure <- read_excel("../Data/OS-N_EPC_v10_LUT+dictionaries.xlsx", sheet = "
 LUT_builtForm <- read_excel("../Data/OS-N_EPC_v10_LUT+dictionaries.xlsx", sheet = "BUILT_FORM",range = cell_cols("B:C"))
 ```
 
+
+## ADD this: save(DLUC_LAD_error, file = paste0("../Data/RData_longitudinal/longitudinalEPCs_DLUC_LAD_error.RData") )   
+
 ```{r WIP_longitudinal}
 start.time <- Sys.time()
 #long_data <- long_data[1] #testing

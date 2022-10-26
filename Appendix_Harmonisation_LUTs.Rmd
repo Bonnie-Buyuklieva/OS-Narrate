@@ -10,74 +10,51 @@ knitr::opts_chunk$set(echo = TRUE)
 library("data.table")
 library("readxl")
 
-loadRData <- function(fileName){
-    #loads an RData file, and returns it
-    load(fileName)
-    get(ls()[ls() != "fileName"])
-}
-
+#pulls functions: loadRData(), entries_to_factors()
+source("../Outputs/Thesis_custom_scripts.R", local = knitr::knit_global())
 ```
 
 
 
 ```{r path}
-#get folders
-folders <- list.files(path = "../Data/all-domestic-certificates", pattern = NULL, all.files = FALSE,
-           full.names = FALSE, recursive = FALSE,
-           ignore.case = FALSE, include.dirs = FALSE, no.. = FALSE)
+# #check folders here:
+# folders <- list.files(path = "../Data/all-domestic-certificates", pattern = NULL, all.files = FALSE,
+#            full.names = FALSE, recursive = FALSE,
+#            ignore.case = FALSE, include.dirs = FALSE, no.. = FALSE)
+# 
+# folders <- folders[-342] #remove the .txt
 
-folders <- folders[-342] #remove the .txt
+
+LAD_region_LUT <- read_excel("../Data/LAD_region_LUT.xlsx")
+folders <-  LAD_region_LUT$folder_name
 ```
 
 #Counting on CSV Directory
-```{r LUT_making}
-entries_to_factors <- function(column_to_extract_factors_from = 'TENURE') {
 
-LUT<- list()
-start.time <- Sys.time()
 
-for (LA in folders) {
+```{r Generate many_LUTS}
+source("../Outputs/Thesis_custom_scripts.R", local = knitr::knit_global())
+library("readxl")
+LAD_region_LUT <- read_excel("../Data/LAD_region_LUT.xlsx")
+folders <-  LAD_region_LUT$folder_name
+
+certificates <- fread(paste0("../Data/all-domestic-certificates/",folders[1],"/certificates.csv"))
+#write.csv( sapply(certificates, class) , file = "../Data/certificate_columns.csv" )
+#manually select which columns to extract
+certificate_columns <- read_csv("../Data/certificate_columns.csv")
+certificate_columns_LUT <- certificate_columns$col[!is.na(certificate_columns$to_LUT)]
+#View(certificate_columns)
+
   
-  #print(LA)
-  certificates <- fread(paste0("../Data/all-domestic-certificates/",LA,"/certificates.csv"),
-                        colClasses = 'character',
-                        select = column_to_extract_factors_from)
-
-  LUT[[LA]] <- unique(certificates[,get(column_to_extract_factors_from)])
-  
+for (column in certificate_columns_LUT){
+  #column = "BUILT_FORM" # testing
+  print(column)
+  LUT <- entries_to_factors(column_to_extract_factors_from = column) # loops through folders
+  write.xlsx(LUT,#file = "../Data/OS-N_EPC_v10_LUT+dictionaries.xlsx", sheetName=column, append=TRUE)  #manually move here for fewer files
+             file = "../Data/OS-N_EPC_v10_LUT+dictionaries_Copy.xlsx", sheetName=column, append=TRUE)
+             
 }
-#shows which factor is in which folder
-folder_to_factor <- as.data.frame(unlist(LUT))
-LUT<- as.data.frame(unique(folder_to_factor$`unlist(LUT)`))
-colnames(LUT) <- paste0( column_to_extract_factors_from, 'factors')
 
-print(paste('loop time:', Sys.time() - start.time))
-
-return(LUT)
-}
-
-
-LUT_built_form <- entries_to_factors(column_to_extract_factors_from = "BUILT_FORM")
-LUT_property_type <- entries_to_factors(column_to_extract_factors_from = "PROPERTY_TYPE")
-LUT_age_band <- entries_to_factors(column_to_extract_factors_from = "CONSTRUCTION_AGE_BAND")
-
-LUT_transaction <- entries_to_factors(column_to_extract_factors_from = "TRANSACTION_TYPE")
-
-#note: I am not doing tallys here because repeat entries will skew the picture
-
-if(F){
-  write.xlsx(LUT_built_form,
-             file = "../Data/OS-N_EPC_v10_LUT+dictionaries.xlsx", sheetName="BUILT_FORM", append=TRUE)  
-  
-  write.xlsx(LUT_property_type,
-             file = "../Data/OS-N_EPC_v10_LUT+dictionaries.xlsx", sheetName="PROPERTY_TYPE", append=TRUE) 
-  
-  write.xlsx(LUT_age_band,
-             file = "../Data/OS-N_EPC_v10_LUT+dictionaries.xlsx", sheetName="CONSTRUCTION_AGE_BAND", append=TRUE)
-  
-  write.xlsx(LUT_transaction,
-             file = "../Data/OS-N_EPC_v10_LUT+dictionaries.xlsx", sheetName="TRANSACTION_TYPE", append=TRUE)
-}
 ```
 
 
@@ -103,5 +80,26 @@ if(F){
 
 
 
+```{r LUT_making}
+LUT_built_form <- entries_to_factors(column_to_extract_factors_from = "BUILT_FORM")
+LUT_property_type <- entries_to_factors(column_to_extract_factors_from = "PROPERTY_TYPE")
+LUT_age_band <- entries_to_factors(column_to_extract_factors_from = "CONSTRUCTION_AGE_BAND")
+LUT_transaction <- entries_to_factors(column_to_extract_factors_from = "TRANSACTION_TYPE")
 
+#note: I am not doing tallys here because repeat entries will skew the picture
+
+if(F){
+  write.xlsx(LUT_built_form,
+             file = "../Data/OS-N_EPC_v10_LUT+dictionaries.xlsx", sheetName="BUILT_FORM", append=TRUE)  
+  
+  write.xlsx(LUT_property_type,
+             file = "../Data/OS-N_EPC_v10_LUT+dictionaries.xlsx", sheetName="PROPERTY_TYPE", append=TRUE) 
+  
+  write.xlsx(LUT_age_band,
+             file = "../Data/OS-N_EPC_v10_LUT+dictionaries.xlsx", sheetName="CONSTRUCTION_AGE_BAND", append=TRUE)
+  
+  write.xlsx(LUT_transaction,
+             file = "../Data/OS-N_EPC_v10_LUT+dictionaries.xlsx", sheetName="TRANSACTION_TYPE", append=TRUE)
+}
+```
 

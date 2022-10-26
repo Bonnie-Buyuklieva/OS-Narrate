@@ -1,0 +1,108 @@
+---
+title: "CS_P2_Assign_UPRN_and_LAD"
+author: "Boyana Buyuklieva"
+date: "September 7, 2022"
+output: html_document
+---
+
+
+#rename the file to be ONSUD_and_additional_raw_dt
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(tidyverse)
+library(data.table)
+library(readxl)
+library(readr)
+
+#loads: loadRData
+source("../Outputs/Thesis_custom_scripts.R", local = knitr::knit_global())
+
+
+#get folders. cross_data is regions
+#LAD_region_LUT <- read_excel("../Data/LAD_region_LUT.xlsx")
+#folders <-  LAD_region_LUT$folder_name
+#regions_CD <- unique(LAD_region_LUT$RGN11CD)
+
+#get ONSUD foldernames
+EDA_cols <- read_csv("../Data/EDA_colour_scheme.csv")
+ONSUD <- EDA_cols$ONSUD[!is.na(EDA_cols$ONSUD)]
+#EDA_cols <- subset(EDA_cols[EDA_cols$geography_name %in%  cross_data, ])
+
+```
+
+```{r setup_merging_spine}
+big_SC_dt<- loadRData( paste0("../Data/RData_crossSectional/big_crossSect_EPCs_cleaned_N16m984358.RData") )
+setkey(big_SC_dt, n_UPRN)
+
+CS_n_UPRN <- big_SC_dt[,list(n_UPRN)]
+rm(big_SC_dt)#free_up_memory
+```
+```{r make_ONSUD_big_dt}
+ONSUD_cols <- c("uprn","cty11cd","ced17cd","lad19cd","wd19cd","parncp19cd","hlth19cd","ctry191cd","rgn17cd","pcon18cd","eer17cd","ttwa15cd","lau219cd", "npark16cd","oa11cd","lsoa11cd","msoa11cd","wz11cd","ccg19cd","bua11cd","buasd11cd","ruc11ind","oac11ind","lep17cd1","lep17cd2","pfa19cd","imd19ind")
+
+#write.csv(ONSUD_cols, file = "../Data/ONSUD_cols.csv")
+  
+additional_ONSUD_dt <- setnames(data.table(matrix(nrow = 0, ncol = length(ONSUD_cols))), ONSUD_cols )
+my_colClasses <- cbind.data.frame(ONSUD_cols,c( rep("character",length(additional_ONSUD_dt)) )  )
+
+
+
+for(file in ONSUD){
+  #for every ONS file, check if we can assign a region based on the UPRN data
+  start.time <- Sys.time()
+  print(paste('In this folder: ',file))
+  
+  #warning about reading as character, but does it anyway  
+  ONSUD_MAY_2020 <- suppressWarnings(fread(paste0("../Data/ONSUD_MAY_2020/Data/ONSUD_MAY_2020_",file,".csv"),
+                                         select =  ONSUD_cols, 
+                                         colClasses=my_colClasses))
+  
+  #get only entries that are in the CS data. Works because I'm passing the key directly
+  setkey(ONSUD_MAY_2020, uprn)
+  ONSUD_MAY_2020 <- ONSUD_MAY_2020[intersect(CS_n_UPRN$n_UPRN,ONSUD_MAY_2020$uprn),]
+  additional_ONSUD_dt <- rbindlist(list(additional_ONSUD_dt,ONSUD_MAY_2020))  
+}
+
+print(paste('loop time:', Sys.time() - start.time))
+```
+
+
+
+additional has all the ONSUD, which would be less than the n_UPRNs that are not NA in big_SC_dt
+
+
+
+
+```{r}
+additional_ONSUD_dt[, n_UPRN:= uprn]
+setkey(additional_ONSUD_dt, n_UPRN)
+
+
+#add the LMK_KEY
+CS_n_UPRN <- big_SC_dt[,list(n_UPRN, LMK_KEY)]
+setkey(CS_n_UPRN, n_UPRN)
+
+CS_n_UPRN[, isna_UPRN:= is.na(n_UPRN)]
+CS_n_UPRN  <- additional_ONSUD_dt[CS_n_UPRN, on = "n_UPRN"]
+summary <- CS_n_UPRN[ , by = c( 'rgn17cd', 'lsoa11cd', 'isna_UPRN') , .N ]
+#write.csv(summary, file = "../Data/summary_ONSUD_cols.csv")
+#remove all entries that were not matched to ONSUD
+CS_n_UPRN <- CS_n_UPRN[!is.na(n_UPRN),]
+CS_n_UPRN <- CS_n_UPRN[!is.na(lsoa11cd),]
+CS_n_UPRN[ , uprn_ONSUD:= uprn] # rename the col
+CS_n_UPRN[ , uprn:= NULL]
+CS_n_UPRN[ , isna_UPRN:= NULL]
+#View(head(CS_n_UPRN) )
+additional_ONSUD_dt_LMK_KEY <- CS_n_UPRN
+#save(additional_ONSUD_dt_LMK_KEY, file = paste0("../Data/RData_crossSectional/big_crossSect_EPCs_cleaned_additional_ONSUD_dt16M293951.RData") ) 
+```
+
+
+
+
+
+
+
