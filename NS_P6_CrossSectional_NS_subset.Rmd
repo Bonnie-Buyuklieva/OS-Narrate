@@ -27,19 +27,96 @@ source("../Outputs/Thesis_custom_scripts.R", local = knitr::knit_global())
 #formatting:
 lettermapping <-  data.frame( letter = c('A','B','C','D','E','F','G'), 
                               cutoff = c(92, 81, 69, 55, 39, 21, 0))
+
+```
+
+TODO:
+
+
+
+# NS Censorship
+
+Exclusions:
+Unknown:
+- Built form
+- Age unknown
+
+To small to count:
+- Park homes
+
+Combined:
+- Terrace (Mid;End;Enclosed Mid & Enclosed End)
+
+
+```{r naChecks}
+if(F){
+#there are no missing values 
+nas <- which(is.na(big_Dt_CSsubset_N16M7$CURRENT_ENERGY_EFFICIENCY))
+nas <- which(is.na(big_Dt_CSsubset_N16M7$POTENTIAL_ENERGY_EFFICIENCY))
+nas <- which(is.na(big_Dt_CSsubset_N16M7$n_potEE))
+
+nas <- which(is.na(big_Dt_CSsubset_N16M7$ENVIRONMENT_IMPACT_CURRENT))
+nas <- which(is.na(big_Dt_CSsubset_N16M7$ENVIRONMENT_IMPACT_POTENTIAL))
+nas <- which(is.na(big_Dt_CSsubset_N16M7$n_potEIC)) 
+
+#contains nas!
+nas <- which(is.na(big_Dt_CSsubset_N16M7$TOTAL_FLOOR_AREA)) 
+}
+```
+
+```{r NS_dt_censorship}
+#
+
+
+#Unexplained high values
+NS_dt <- dupsrm[ n_CURRENT_ENERGY_EFFICIENCY < 101,] # drops = 3 094 
+NS_dt <- NS_dt[ n_ENVIRONMENT_IMPACT_POTENTIAL < 101,] # drops a further = 92 699
+
+NS_dt[, n_CURRENT_ENERGY_EFFICIENCY := NULL]
+NS_dt[, n_ENVIRONMENT_IMPACT_POTENTIAL := NULL]
+
+maxthreshold <- round(quantile(dupsrm$TOTAL_FLOOR_AREA, 0.99, na.rm = T),0) 
+minthreshold <- round(quantile(dupsrm$TOTAL_FLOOR_AREA, 0.01, na.rm = T),0) 
+
+NS_dt <- NS_dt[ minthreshold < NS_dt$TOTAL_FLOOR_AREA,] # drops a further ~ 167 731 
+NS_dt <- NS_dt[ maxthreshold > NS_dt$TOTAL_FLOOR_AREA,] # drops a further ~ 166 758
+NS_dt[, n_TOTAL_FLOOR_AREA := NULL]
+NS_dt <- NS_dt[ !is.na(TOTAL_FLOOR_AREA),] # checks 
+
+#cannot explain, so removed
+NS_dt <- NS_dt[ n_construction_age_band != 'unknown',] # drops 208 708
+
+sample <- lengths(NS_dt )[1] # 16 440 270 
+sample
+
+#save( NS_dt , file = "../Outputs/WIP_crossSectional/NS_subset_N16m111443.RData")
+
+#NS_dt[ order( )]
+#had dups issue
+#save( NS_dt , file = "../Outputs/WIP_crossSectional/NS_subset_N16m440270.RData")
+```
+
+
+
+
+
+
+
+
+
+threeway_probability_density:
+# different x axis labels:
+#x.var = 'CO2_EMISS_CURR_PER_FLOOR_AREA', 'TOTAL_FLOOR_AREA'
+
+```{r}
 #NS_dt_N16m4 <- loadRData("../Outputs/WIP_crossSectional/NS_subset_N16m440270.RData")
-NS_dt_N16m1 <- loadRData("../Outputs/WIP_crossSectional/NS_subset_N16m111443.RData")
+#NS_dt_N16m1 <- loadRData("../Outputs/WIP_crossSectional/NS_subset_N16m111443.RData")
 
 #move to the subsetting script
 NS_dt_N16m1 <- NS_dt_N16m1[ !nn_construction_age_band == 'unknown']#14472351
 
 NS_dt_N16m1 <- NS_dt_N16m1[,nn_builtForm:= factor(nn_builtForm, levels = c('Terrace','Semi-Detached','Detached'), ordered = T), ]
 ```
-
-threeway_probability_density:
-# different x axis labels:
-#x.var = 'CO2_EMISS_CURR_PER_FLOOR_AREA', 'TOTAL_FLOOR_AREA'
-
 
 
 

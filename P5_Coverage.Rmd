@@ -202,3 +202,17 @@ Sys.time() - start.time
 
 
 
+
+#Todo:
+```{r change_col_based_on_LUTs}
+  #N: create new Tenure column
+  LUT_colum <- LUT_tenure[match(big_Dt_CSsubset_N6M7$TENURE, LUT_tenure$tenure_factors),"harmonisation"]
+  big_Dt_CSsubset_N6M7[,n_tenure := LUT_colum]
+  big_Dt_CSsubset_N6M7[is.na(n_tenure),n_tenure := 'unknown'] #deals with NAs
+      
+  #N: create new Built Form column
+  LUT_colum <- LUT_builtForm[match(big_Dt_CSsubset_N6M7$BUILT_FORM, LUT_builtForm$BUILT_FORMfactors),"harmonisation"]
+  big_Dt_CSsubset_N6M7[,n_builtForm := LUT_colum]
+  big_Dt_CSsubset_N6M7[is.na(n_builtForm),n_builtForm := 'unknown'] 
+```
+
