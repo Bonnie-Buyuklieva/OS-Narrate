@@ -1,7 +1,7 @@
 ---
 title: "CS_P3"
 author: "Boyana Buyuklieva"
-date: "August 30, 2022"
+date: "September 26, 2022"
 output: html_document
 ---
 
@@ -256,18 +256,7 @@ rm(ONSUD_dt)
 ```
 
 
-
-
-```{r}
-big_SC_dt <- combi_SC_dt[, c("LMK_KEY","lsoa11cd") ,with = F]
-#multiple deprivation EW
-#IMD19<- read.dbf("../Data/_shapefiles/Lower_Super_Output_Area_(LSOA)_IMD_2019__(OSGB1936)/Lower_Super_Output_Area_(LSOA)_IMD_2019__(OSGB1936).dbf")
-#big_SC_dt[IMD19,  on = 'lsoa11cd', c('n_IMDRank_EW','n_IMDDecil_EW') := .(IMDRank,IMDDecil)]
-```
-
-
-
-```{r attach_IMDs}
+```{r attach_IMDs-England}
 #income deprivation E
 income_imd2019lsoa_E <- fread("../Data/imd2019lsoa/imd2019lsoa.csv",
                      drop="Units", #empty column anyway
@@ -285,19 +274,19 @@ setnames(income_imd2019lsoa_E, c("FeatureCode"), c("lsoa11cd"))
 #Add IoD
 ##can select other IoD here
 #b.income
-imd_bincome <-  income_imd2019lsoa_E[ `Indices of Deprivation` == "b. Income Deprivation Domain",]
-imd_bincome <-dcast(imd_bincome, lsoa11cd ~ Measurement, value.var = c("Value"))
-big_SC_dt[imd_bincome,  on = 'lsoa11cd', c('n_bIoDRank_income','n_bIoDDecil_income') := .(Rank,Decile)]
+imd2019col <-  income_imd2019lsoa_E[ `Indices of Deprivation` == "b. Income Deprivation Domain",]
+imd2019col <-dcast(imd2019col, lsoa11cd ~ Measurement, value.var = c("Value"))
+combi_SC_dt[imd2019col,  on = 'lsoa11cd', c('n_bIoDRank_income','n_bIoDDecil_income') := .(Rank,Decile)]
 #Make barriers deprivation groups
-big_SC_dt[ , n_bIoDDecil_income_grp := cut(n_bIoDDecil_income,
+combi_SC_dt[ , n_bIoDDecil_income_grp := cut(n_bIoDDecil_income,
                             breaks = c(0, 3, 7, Inf),
                             include.lowest= TRUE, labels=c('IncomeDeprived_1-3','AverageIncome_4-7','IncomeUnDeprived_8-10'))]
 
 
 #g. Barriers to Housing and Services
-imd_gbarriers <-  income_imd2019lsoa_E[ `Indices of Deprivation` == "g. Barriers to Housing and Services Domain",]
-imd_gbarriers <-dcast(imd_gbarriers, lsoa11cd ~ Measurement, value.var = c("Value"))
-combi_SC_dt[imd_gbarriers,  on = 'lsoa11cd', c('n_gIoDRank_barriers','n_gIoDDecil_barriers') := .(Rank,Decile)]
+imd2019col <-  income_imd2019lsoa_E[ `Indices of Deprivation` == "g. Barriers to Housing and Services Domain",]
+imd2019col <-dcast(imd2019col, lsoa11cd ~ Measurement, value.var = c("Value"))
+combi_SC_dt[imd2019col,  on = 'lsoa11cd', c('n_gIoDRank_barriers','n_gIoDDecil_barriers') := .(Rank,Decile)]
 #Make barriers deprivation groups
 combi_SC_dt[ , n_gIoDDecil_housing_grp := cut(n_gIoDDecil_barriers,
                             breaks = c(0, 3, 7, Inf),
@@ -305,17 +294,31 @@ combi_SC_dt[ , n_gIoDDecil_housing_grp := cut(n_gIoDDecil_barriers,
 
 
 #i. Income Deprivation Affecting Children Index (IDACI)
-imd_iChildren <-  income_imd2019lsoa_E[ `Indices of Deprivation` == "i. Income Deprivation Affecting Children Index (IDACI)",]
-imd_iChildren <-dcast(imd_iChildren, lsoa11cd ~ Measurement, value.var = c("Value"))
-combi_SC_dt[imd_iChildren,  on = 'lsoa11cd', c('n_iIoDRank_barriers','n_iIoDDecil_barriers') := .(Rank,Decile)]
+imd2019col <-  income_imd2019lsoa_E[ `Indices of Deprivation` == "i. Income Deprivation Affecting Children Index (IDACI)",]
+imd2019col <-dcast(imd2019col, lsoa11cd ~ Measurement, value.var = c("Value"))
+combi_SC_dt[imd2019col,  on = 'lsoa11cd', c('n_iIoDRank_IDACI','n_iIoDDecil_IDACI') := .(Rank,Decile)]
 #Make barriers deprivation groups
-combi_SC_dt[ , n_iIoDDecil_housing_grp := cut(n_iIoDDecil_barriers,
+combi_SC_dt[ , n_iIoDDecil_IDACI_grp := cut(n_iIoDDecil_IDACI,
                             breaks = c(0, 3, 7, Inf),
                             include.lowest= TRUE, labels=c('Deprived_Child_1-3','Average.C.Income_4-7','UnDeprived_Child_8-10'))]
+
+
+
+#j. Income Deprivation Affecting Older People Index (IDAOPI)
+imd_jOlderPerson <-  income_imd2019lsoa_E[ `Indices of Deprivation` == "j. Income Deprivation Affecting Older People Index (IDAOPI)",]
+imd_jOlderPerson <-dcast(imd_jOlderPerson, lsoa11cd ~ Measurement, value.var = c("Value"))
+combi_SC_dt[imd_jOlderPerson,  on = 'lsoa11cd', c('n_jIoDRank_IDAOPI','n_jIoDDecil_IDAOPI') := .(Rank,Decile)]
+#Make barriers deprivation groups
+combi_SC_dt[ , n_jIoDDecil_IDAOPI_grp := cut(n_jIoDDecil_IDAOPI,
+                            breaks = c(0, 3, 7, Inf),
+                            include.lowest= TRUE, labels=c('Deprived_Older_1-3','Average.O.Income_4-7','UnDeprived_Older_8-10'))]
 ```
 
 
 
+```{r}
+save(combi_SC_dt, file ="../Data/RData_crossSectional/_combi_SC_dt_big_crossSect_EPCs_cleaned_N16m984358.RData") 
+```
 
 
 
