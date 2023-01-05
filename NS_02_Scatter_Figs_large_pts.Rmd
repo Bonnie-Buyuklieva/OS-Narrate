@@ -1,0 +1,298 @@
+---
+title: "NS_02_Scatter_Figs"
+author: "Bonnie Buyuklieva"
+date: "2022-10-26"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+source("../Outputs/Thesis_custom_scripts.R", local = knitr::knit_global())
+library(ggplot2)
+library(data.table)
+library(readr)
+
+
+#formatting:
+lettermapping <-  data.frame( letter = c('A','B','C','D','E','F','G'), 
+                              cutoff = c(92, 81, 69, 55, 39, 21, 0))
+
+NS_dt <- loadRData( "../Data/RData_crossSectional/_NS_dt_N14m377170.RData")
+```
+
+```{r}
+#NS_dt1 <- NS_dt
+#NS_dt <- NS_dt1 
+#rm(NS_dt1)
+#NS_dt <- NS_dt[, .SD[sample(.N, 300)], ]
+```
+
+# ```{r grp_imd19ind}
+# #NOTE!
+# NS_dt[, imd19ind:=as.integer(imd19ind)]
+# NS_dt[ , imd19ind_grp := cut(imd19ind,
+#                             breaks = c(0, 3, 7, Inf),
+#                             include.lowest= TRUE, labels=c('M.Deprived.1-3','Average_4-7','M.Deprived.8-10'))]
+# 
+# 
+# full_sample = lengths(NS_dt[!is.na(imd19ind_grp)])[1]
+# 
+# color <- 'imd19ind_grp'
+# color <- rlang::sym(color)
+# 
+# ggplot(NS_dt[!is.na(imd19ind_grp)], aes(CURRENT_ENERGY_EFFICIENCY, ENVIRONMENT_IMPACT_CURRENT))+
+# #edited <- ggplot(dt, aes(CURRENT_ENERGY_EFFICIENCY, ENVIRONMENT_IMPACT_CURRENT))+
+#  geom_point(aes(color = !!color, 
+#                 alpha = 0.001,
+#                 stroke = 0),
+#                 size = .5) +
+#   geom_smooth(method = "lm", 
+#                     se = FALSE, 
+#                     aes(color = factor(!!color)),
+#                     size=2) +
+#   theme_minimal()+
+#  
+#   scale_x_continuous( breaks= lettermapping$cutoff)+
+#   scale_y_continuous( breaks= lettermapping$cutoff)+
+#   annotate("text",x = lettermapping$cutoff+5, y= 0.1, label=lettermapping$letter, angle=90, size=5)+
+#   annotate("text",y = lettermapping$cutoff+5, x= 0.1, label=lettermapping$letter, angle=90, size=5)+
+#   labs(title = "", subtitle = paste0("Subset n=", full_sample) )+
+#   labs(title = "Energy Efficiency vs Environmental Impact ", 
+#        caption ='Author: Bonnie Buyuklieva, @Bonnie_0000 \n Project: OS Narrate, UCL 2022-23 \nCentre for Advanced Spatial Analysis ')+
+#   labs(x = 'Current Energy Efficiency \n (higher - lower running cost)')+
+#   labs(y = 'Current Environmental Impact \n (higher - lower C02 emissions)')+
+#   scale_colour_brewer(palette = "Set1", direction = -1)+
+#   #theme(legend.position = 'bottom', legend.box = 'horizontal')+
+#   theme(legend.title=element_blank())
+# 
+# ggsave(paste0("../Outputs/plots/20221027_SC_EPC_scatter_",setting,"_grp_imd19ind.png" ), width = 21, height = 27, units = "cm" )
+# 
+# ```
+```{r}
+setting <- 'big pts'
+```
+
+
+
+```{r nn_construction_age_band}
+start.time <- Sys.time()
+full_sample = lengths(NS_dt)[1]
+
+color <- 'nn_construction_age_band'
+color <- rlang::sym(color)
+
+ggplot(NS_dt, aes(CURRENT_ENERGY_EFFICIENCY, ENVIRONMENT_IMPACT_CURRENT))+
+#edited <- ggplot(dt, aes(CURRENT_ENERGY_EFFICIENCY, ENVIRONMENT_IMPACT_CURRENT))+
+ geom_point(aes(color = !!color, 
+                alpha = 0.001,
+                stroke = 0.001),
+                size = 1.1) +
+  #                size = .5) +
+  # geom_smooth(method = "lm", 
+  #                   se = FALSE, 
+  #                   aes(color = factor(!!color)),
+  #                   size=2) +
+  theme_minimal()+
+ 
+  scale_x_continuous( breaks= lettermapping$cutoff)+
+  scale_y_continuous( breaks= lettermapping$cutoff)+
+  annotate("text",x = lettermapping$cutoff+5, y= 0.1, label=lettermapping$letter, angle=90, size=5)+
+  annotate("text",y = lettermapping$cutoff+5, x= 0.1, label=lettermapping$letter, angle=90, size=5)+
+  labs(title = "", subtitle = paste0("Subset n=", full_sample) )+
+  labs(title = "Energy Efficiency vs Environmental Impact ", 
+       caption ='Author: Bonnie Buyuklieva, @Bonnie_0000 \n Project: OS Narrate, UCL 2022-23 \nCentre for Advanced Spatial Analysis ')+
+  labs(x = 'Current Energy Efficiency \n (higher - lower running cost)')+
+  labs(y = 'Current Environmental Impact \n (higher - lower C02 emissions)')+
+  #theme(legend.position = 'bottom', legend.box = 'horizontal')+
+  theme(legend.title=element_blank())
+
+ggsave(paste0("../Outputs/plots/20221027_SC_EPC_scatter_",setting,"_nn_construction_age_band.png" ), width = 21, height = 27, units = "cm" )
+print(paste('nn_construction_age_band', Sys.time() - start.time ))
+```
+
+```{r n_tenure}
+start.time <- Sys.time()
+full_sample = lengths(NS_dt[n_tenure!='unknown'])[1]
+
+color <- 'n_tenure'
+color <- rlang::sym(color)
+
+ggplot(NS_dt[n_tenure!='unknown'], aes(CURRENT_ENERGY_EFFICIENCY, ENVIRONMENT_IMPACT_CURRENT))+
+#edited <- ggplot(dt, aes(CURRENT_ENERGY_EFFICIENCY, ENVIRONMENT_IMPACT_CURRENT))+
+ geom_point(aes(color = !!color, 
+                alpha = 0.001,
+                stroke = 0),
+                 size = 1.1) +
+  #                size = .5) +
+  # geom_smooth(method = "lm", 
+  #                   se = FALSE, 
+  #                   aes(color = factor(!!color)),
+  #                   size=2) +
+  theme_minimal()+
+ 
+  scale_x_continuous( breaks= lettermapping$cutoff)+
+  scale_y_continuous( breaks= lettermapping$cutoff)+
+  annotate("text",x = lettermapping$cutoff+5, y= 0.1, label=lettermapping$letter, angle=90, size=5)+
+  annotate("text",y = lettermapping$cutoff+5, x= 0.1, label=lettermapping$letter, angle=90, size=5)+
+  labs(title = "", subtitle = paste0("Subset n=", full_sample) )+
+  labs(title = "Energy Efficiency vs Environmental Impact ", 
+       caption ='Author: Bonnie Buyuklieva, @Bonnie_0000 \n Project: OS Narrate, UCL 2022-23 \nCentre for Advanced Spatial Analysis ')+
+  labs(x = 'Current Energy Efficiency \n (higher - lower running cost)')+
+  labs(y = 'Current Environmental Impact \n (higher - lower C02 emissions)')+
+  scale_colour_brewer(palette = "Set1", direction = -1)+
+  #theme(legend.position = 'bottom', legend.box = 'horizontal')+
+  theme(legend.title=element_blank())
+
+ggsave(paste0("../Outputs/plots/20221027_SC_EPC_scatter_",setting,"_n_tenure.png" ), width = 21, height = 27, units = "cm" )
+print(paste('n_tenure', Sys.time() - start.time ))
+```
+
+```{r n_bIoDDecil_income_grp}
+start.time <- Sys.time()
+full_sample = lengths(NS_dt[!is.na(n_bIoDDecil_income_grp)])[1]
+
+color <- 'n_bIoDDecil_income_grp'
+color <- rlang::sym(color)
+
+ggplot(NS_dt[!is.na(n_bIoDDecil_income_grp)], aes(CURRENT_ENERGY_EFFICIENCY, ENVIRONMENT_IMPACT_CURRENT))+
+#edited <- ggplot(dt, aes(CURRENT_ENERGY_EFFICIENCY, ENVIRONMENT_IMPACT_CURRENT))+
+ geom_point(aes(color = !!color, 
+                alpha = 0.001,
+                stroke = 0),
+                size = 1.1) +
+  #                size = .5) +
+  # geom_smooth(method = "lm", 
+  #                   se = FALSE, 
+  #                   aes(color = factor(!!color)),
+  #                   size=2) +
+  theme_minimal()+
+ 
+  scale_x_continuous( breaks= lettermapping$cutoff)+
+  scale_y_continuous( breaks= lettermapping$cutoff)+
+  annotate("text",x = lettermapping$cutoff+5, y= 0.1, label=lettermapping$letter, angle=90, size=5)+
+  annotate("text",y = lettermapping$cutoff+5, x= 0.1, label=lettermapping$letter, angle=90, size=5)+
+  labs(title = "", subtitle = paste0("Subset n=", full_sample) )+
+  labs(title = "Energy Efficiency vs Environmental Impact ", 
+       caption ='Author: Bonnie Buyuklieva, @Bonnie_0000 \n Project: OS Narrate, UCL 2022-23 \nCentre for Advanced Spatial Analysis ')+
+  labs(x = 'Current Energy Efficiency \n (higher - lower running cost)')+
+  labs(y = 'Current Environmental Impact \n (higher - lower C02 emissions)')+
+  scale_colour_brewer(palette = "Set1", direction = -1)+
+  #theme(legend.position = 'bottom', legend.box = 'horizontal')+
+  theme(legend.title=element_blank())
+
+ggsave(paste0("../Outputs/plots/20221027_SC_EPC_scatter_",setting,"_n_bIoDDecil_income_grp.png" ), width = 21, height = 27, units = "cm" )
+print(paste('income', Sys.time() - start.time ))
+```
+
+```{r nn_builtForm,n_propTyp}
+full_sample = lengths(NS_dt)[1]
+start.time <- Sys.time()
+
+
+color <- 'n_interact'
+color <- rlang::sym(color)
+
+ggplot(NS_dt, aes(CURRENT_ENERGY_EFFICIENCY, ENVIRONMENT_IMPACT_CURRENT))+
+#edited <- ggplot(dt, aes(CURRENT_ENERGY_EFFICIENCY, ENVIRONMENT_IMPACT_CURRENT))+
+ geom_point(aes(color = !!color, 
+                alpha = 0.001,
+                stroke = 0),
+                 size = 1.1) +
+  #                size = .5) +
+  # geom_smooth(method = "lm", 
+  #                   se = FALSE, 
+  #                   aes(color = factor(!!color)),
+  #                   size=2) +
+  theme_minimal()+
+ 
+  scale_x_continuous( breaks= lettermapping$cutoff)+
+  scale_y_continuous( breaks= lettermapping$cutoff)+
+  annotate("text",x = lettermapping$cutoff+5, y= 0.1, label=lettermapping$letter, angle=90, size=5)+
+  annotate("text",y = lettermapping$cutoff+5, x= 0.1, label=lettermapping$letter, angle=90, size=5)+
+  labs(title = "", subtitle = paste0("Subset n=", full_sample) )+
+  labs(title = "Energy Efficiency vs Environmental Impact ", 
+       caption ='Author: Bonnie Buyuklieva, @Bonnie_0000 \n Project: OS Narrate, UCL 2022-23 \nCentre for Advanced Spatial Analysis ')+
+  labs(x = 'Current Energy Efficiency \n (higher - lower running cost)')+
+  labs(y = 'Current Environmental Impact \n (higher - lower C02 emissions)')+
+  scale_colour_brewer(palette = "Set3", direction = -1)+
+  #theme(legend.position = 'bottom', legend.box = 'horizontal')+
+  theme(legend.title=element_blank())
+
+ggsave(paste0("../Outputs/plots/20221027_SC_EPC_scatter_",setting,"_n_interact.png" ), width = 21, height = 27, units = "cm" )
+print(paste('nn_builtForm,n_propTyp', Sys.time() - start.time ))
+```
+
+```{r n_gIoDDecil_housing_grp}
+start.time <- Sys.time()
+full_sample = lengths(NS_dt[!is.na(n_gIoDDecil_housing_grp)])[1]
+
+color <- 'n_gIoDDecil_housing_grp'
+color <- rlang::sym(color)
+
+ggplot(NS_dt[!is.na(n_gIoDDecil_housing_grp)], aes(CURRENT_ENERGY_EFFICIENCY, ENVIRONMENT_IMPACT_CURRENT))+
+#edited <- ggplot(dt, aes(CURRENT_ENERGY_EFFICIENCY, ENVIRONMENT_IMPACT_CURRENT))+
+ geom_point(aes(color = !!color, 
+                alpha = 0.001,
+                stroke = 0),
+                size = 1.1) +
+  #                size = .5) +
+  # geom_smooth(method = "lm", 
+  #                   se = FALSE, 
+  #                   aes(color = factor(!!color)),
+  #                   size=2) +
+  theme_minimal()+
+ 
+  scale_x_continuous( breaks= lettermapping$cutoff)+
+  scale_y_continuous( breaks= lettermapping$cutoff)+
+  annotate("text",x = lettermapping$cutoff+5, y= 0.1, label=lettermapping$letter, angle=90, size=5)+
+  annotate("text",y = lettermapping$cutoff+5, x= 0.1, label=lettermapping$letter, angle=90, size=5)+
+  labs(title = "", subtitle = paste0("Subset n=", full_sample) )+
+  labs(title = "Energy Efficiency vs Environmental Impact ", 
+       caption ='Author: Bonnie Buyuklieva, @Bonnie_0000 \n Project: OS Narrate, UCL 2022-23 \nCentre for Advanced Spatial Analysis ')+
+  labs(x = 'Current Energy Efficiency \n (higher - lower running cost)')+
+  labs(y = 'Current Environmental Impact \n (higher - lower C02 emissions)')+
+  scale_colour_brewer(palette = "Set1", direction = -1)+
+  #theme(legend.position = 'bottom', legend.box = 'horizontal')+
+  theme(legend.title=element_blank())
+
+ggsave(paste0("../Outputs/plots/20221027_SC_EPC_scatter_",setting,"_n_gIoDDecil_housing_grp.png" ), width = 21, height = 27, units = "cm" )
+print(paste('n_gIoDDecil_housing_grp', Sys.time() - start.time ))
+```
+
+```{r ruc11ind}
+full_sample = lengths(NS_dt[!is.na(ruc11ind)])[1]
+
+color <- 'ruc11ind'
+color <- rlang::sym(color)
+
+ggplot(NS_dt[!is.na(ruc11ind)], aes(CURRENT_ENERGY_EFFICIENCY, ENVIRONMENT_IMPACT_CURRENT))+
+#edited <- ggplot(dt, aes(CURRENT_ENERGY_EFFICIENCY, ENVIRONMENT_IMPACT_CURRENT))+
+ geom_point(aes(color = !!color, 
+                alpha = 0.001,
+                stroke = 0),
+                size = 1.1) +
+  #                size = .5) +
+  # geom_smooth(method = "lm", 
+  #                   se = FALSE, 
+  #                   aes(color = factor(!!color)),
+  #                   size=2) +
+  theme_minimal()+
+ 
+  scale_x_continuous( breaks= lettermapping$cutoff)+
+  scale_y_continuous( breaks= lettermapping$cutoff)+
+  annotate("text",x = lettermapping$cutoff+5, y= 0.1, label=lettermapping$letter, angle=90, size=5)+
+  annotate("text",y = lettermapping$cutoff+5, x= 0.1, label=lettermapping$letter, angle=90, size=5)+
+  labs(title = "", subtitle = paste0("Subset n=", full_sample) )+
+  labs(title = "Energy Efficiency vs Environmental Impact ", 
+       caption ='Author: Bonnie Buyuklieva, @Bonnie_0000 \n Project: OS Narrate, UCL 2022-23 \nCentre for Advanced Spatial Analysis ')+
+  labs(x = 'Current Energy Efficiency \n (higher - lower running cost)')+
+  labs(y = 'Current Environmental Impact \n (higher - lower C02 emissions)')+
+  scale_colour_brewer(palette = "Set1", direction = -1)+
+  #theme(legend.position = 'bottom', legend.box = 'horizontal')+
+  theme(legend.title=element_blank())
+
+ggsave(paste0("../Outputs/plots/20221027_SC_EPC_scatter_",setting,"_n_gIoDDecil_housing_grp.png" ), width = 21, height = 27, units = "cm" )
+
+```
+
+

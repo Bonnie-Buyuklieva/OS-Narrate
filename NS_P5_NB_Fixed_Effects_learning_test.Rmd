@@ -1,0 +1,306 @@
+---
+title: "P5_Descriptives"
+author: "Bonnie Buyuklieva"
+date: "2022-11-07"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(data.table)
+library(ggplot2)
+library(readr)
+library(lme4)
+library(jtools)
+
+
+source("../Outputs/Thesis_custom_scripts.R", local = knitr::knit_global())
+data <- loadRData( "../Data/RData_crossSectional/_NS_dt_N14m377170.RData")
+#dataCS <- loadRData( "../Data/RData_crossSectional/_combi_SC_dt_big_crossSect_EPCs_cleaned_N16m984358.RData")
+
+
+#
+#SAP Climatic Regions - move to 00_P3
+climatic <- as.data.table(read_csv("../Data/m_SAP_climatic_May_2020_combined.csv"))
+climatic$lad19cd <- climatic$lad20cd 
+data[climatic,  on = 'lad19cd', SAP_climate_grp := SAP_climat]
+
+#Add SAP version
+data[ , SAP_version := year(INSPECTION_DATE)]
+#contains some INSPECTION_DATE nas
+data[ , SAP_version := ifelse(SAP_version < 2005 , 'SAP05', ifelse(SAP_version < 2009, 'SAP09', 'SAP12'))]
+
+
+#Adjust Age
+#possibly remove nn_construction_age_band
+data[ , inspection_yr := year(INSPECTION_DATE)]
+#1 issue: '216525930262009012815361707988770', 2007 onward, but inspected in 2000
+#View(data[ ,  .(n = .N), by = c('n_construction_age_band','inspection_yr')])
+data[ , nnn_construction_age_band := n_construction_age_band]
+data[ nnn_construction_age_band == "2007 onwards", nnn_construction_age_band := ifelse(inspection_yr < 2012, '2007-2011', ifelse( inspection_yr > 2011, "2012 onwards" ,"unknown" ) )]
+data[ , nnn_construction_age_band := droplevels(nnn_construction_age_band)] #rm,"2007 onwards"
+#might need to relevel
+
+```
+
+
+#PRBF: Bungalow, Flat (), 
+x_simp_nn_builtFormXn_propTyp[5]
+
+diff:
+lm()
+glm()
+lmer()
+
+
+
+
+```{r M0_emptyModel}
+start.t <- Sys.time()
+m0 <- lm(formula = CURRENT_ENERGY_EFFICIENCY ~ NULL, data = data)
+#m0 <- lmer(formula = CURRENT_ENERGY_EFFICIENCY ~ 1, data = data)
+#No random effects terms specified in formula
+Sys.time() - start.t
+
+m0 
+#plot intercept on histogram
+```
+
+```{r M0_histogram}
+#All EPCS histo
+lettermapping <-  data.frame( letter = c('A','B','C','D','E','F','G'), 
+                              cutoff = c(92, 81, 69, 55, 39, 21, 0))
+
+ggplot() + geom_histogram(data = data[RGN11NM == 'London'], 
+                              aes(CURRENT_ENERGY_EFFICIENCY , alpha=0.9 ),
+                              binwidth = 1)+
+  geom_vline( xintercept =  lettermapping$cutoff, colour = 'grey', size=.6)+ 
+  annotate("text",x = lettermapping$cutoff+5, y= 0.1, label=lettermapping$letter, angle=90, size=5)+
+  #theme_classic() +
+  theme_minimal()+
+  theme(legend.position = 'bottom', legend.box = 'horizontal')+
+  scale_x_continuous(name = 'Current Energy Efficiency' , breaks= lettermapping$cutoff)+
+  #scale_y_continuous(name = 'Count of EPCs' ,breaks=seq(0,100000,10000))+
+  theme(legend.position="none")+
+  labs(title = 'Current Energy Efficiency - M0 - empty model (mean)',
+         tag = paste0("N = ", format(lengths(data)[1], big.mark=" ", trim=TRUE)) ) +
+  geom_vline(xintercept = m0$coefficients, colour = 'red', size = 1) 
+```
+
+
+There is a difference between dummy and one-hot-encoding. [Dummy omits one subgroup, one-hot keeps all.](https://stats.stackexchange.com/questions/231285/dropping-one-of-the-columns-when-using-one-hot-encoding). [Less than full rank encoding because each factor has a dummy variable for each level. This creates perfect collinearity which may cause problems with some statistical learning algorithms (e.g., ordinary linear regression and neural networks). A full-rank encoding can be obtained by dropping one of the levels](https://www.cfholbert.com/blog/categorical-encoding/)
+
+One-hot is used for [regularized fitting](https://stats.stackexchange.com/questions/231285/dropping-one-of-the-columns-when-using-one-hot-encoding). One example is [gmlnet](https://stats.stackexchange.com/questions/423054/how-to-interpret-coefficients-of-a-multinomial-elastic-net-glmnet-regression)
+
+```{r encodingCheck}
+#https://datatricks.co.uk/one-hot-encoding-in-r-three-simple-methods
+fit <- data[ , .(LMK_KEY, nnn_construction_age_band, x_simp_nn_builtFormXn_propTyp) ]
+newdata <- dcast(data = melt(fit, id.vars = "LMK_KEY"), LMK_KEY ~ variable + value, fun = length)
+newdata[data, on = 'LMK_KEY', CURRENT_ENERGY_EFFICIENCY := CURRENT_ENERGY_EFFICIENCY ]
+setkey(newdata, 'LMK_KEY')
+
+start.t <- Sys.time()
+#set.seed(100)
+m1_hot_1 <- lm( formula = CURRENT_ENERGY_EFFICIENCY ~ . , data = newdata[,.SD, .SDcols = !c('LMK_KEY')]) #[sample(.N,200)])
+#m1_hot <- lme4::lmer( CURRENT_ENERGY_EFFICIENCY ~ . + (1 | LMK_KEY), data = newdata)
+
+
+print(Sys.time() - start.t)
+
+summ(m1_hot_1)
+
+
+summ(lm( formula = CURRENT_ENERGY_EFFICIENCY ~ . , data = newdata[,.SD, .SDcols = !c('LMK_KEY')][sample(.N,20000)]) )
+
+summ(lm( formula = CURRENT_ENERGY_EFFICIENCY ~ . , data = data[sample(.N,20000)]) )
+```
+
+
+
+
+
+```{r M1_age_PTBF_vars_2}
+#x_simp_nn_builtFormXn_propTyp[5]
+#nnn_construction_age_band[12]
+flights[, .(delay_arr = arr_delay, delay_dep = dep_delay)]
+fit <- data[ , .(CURRENT_ENERGY_EFFICIENCY, nnn_construction_age_band = factor( nnn_construction_age_band , ordered = FALSE ), 
+                 x_simp_nn_builtFormXn_propTyp = factor( x_simp_nn_builtFormXn_propTyp , ordered = FALSE )) ]
+
+
+start.t <- Sys.time()
+seed(100)
+m1_1 <- lm( formula = CURRENT_ENERGY_EFFICIENCY ~ nnn_construction_age_band + x_simp_nn_builtFormXn_propTyp, data = fit[sample(.N,200)])
+
+m1_11 <- lm( formula = CURRENT_ENERGY_EFFICIENCY ~ nnn_construction_age_band + x_simp_nn_builtFormXn_propTyp, ordered=F , data = data)
+Sys.time() - start.t #< 1min
+
+summ(m1)
+```
+Ordered factor: [R's default is to fit a series of polynomial functions or contrasts to the levels of the variable. The first is linear (.L), the second is quadratic (.Q), the third is cubic (.C), and so on](https://stackoverflow.com/questions/57297771/interpretation-of-l-q-c-4-for-logistic-regression)
+
+```{r M2_age_PTBF__SAP_climate_date_vars_4}
+start.t <- Sys.time()
+m2 <- lm( formula = CURRENT_ENERGY_EFFICIENCY ~ nnn_construction_age_band + x_simp_nn_builtFormXn_propTyp)
+Sys.time() - start.t
+```
+
+
+```{r M2_age_PTBF__SAP_climate_date__LAD_vars_5}
+start.t <- Sys.time()
+
+Sys.time() - start.t
+```
+
+
+
+```{r tallies}
+#tally
+a_tally <- data[ ,  .(n = .N), by = c('n_tenure') ]
+a_tally <- data[ ,  .(n = .N), by = c('x_nn_builtFormXn_propTyp') ]
+```
+
+
+```{r boxplots_raw}
+ggplot(
+       data, 
+       #data[CURRENT_ENERGY_EFFICIENCY< minthreshold & CURRENT_ENERGY_EFFICIENCY> maxthreshold], 
+       aes(x=CURRENT_ENERGY_EFFICIENCY, 
+                 y=nn_builtForm, fill=n_propTyp)) + 
+    geom_boxplot() #+    facet_wrap(~n_tenure, scale="free")
+```
+
+
+
+
+##control for age, n_propTyp and then n_tenure. 
+
+```{r barplots}
+ggplot(data) + geom_bar(aes(y = ssimp_nn_construction_age_band))+
+  theme_minimal()+
+  theme(legend.position = 'bottom', legend.box = 'horizontal')+
+  #scale_x_continuous(name = 'Count of EPCs' ,breaks=seq(0,500000,2500000))+
+  theme(legend.position="none")+
+  labs(title = 'Age Bands',
+         tag = paste0("N = ", format(lengths(data)[1], big.mark=" ", trim=TRUE)) ) 
+```
+
+
+
+
+
+
+
+```{r 2_way_Age_Property_Type}
+library('svglite')
+
+#slide_Age_Property_Type <-  
+  
+  
+  ggplot(dat = data, 
+       aes(x= ssimp_nn_construction_age_band, y=stat(count), fill = ssimp_nn_construction_age_band))+
+  geom_bar()+
+  facet_grid(n_CEE_binary ~ n_propTyp, scale = "free_y") +
+  #coord_flip()+
+  labs( x = 'Building Age and Property Type', y = 'Number of properties' )+
+  theme_minimal()+
+  theme(axis.text.y = element_text(hjust = 1, size=6),
+        axis.text.x = element_text(angle = 25, hjust = 1, size=7),
+        legend.position="none")+
+  labs(subtitle = paste0("n=", format(lengths(data)[1], big.mark = ' ') ) ) +
+  labs(title = "Building Characteristics of Cross-sectional EPC Records", caption ='Author: Bonnie Buyuklieva, @Bonnie_0000 \n Project: OS Narrate, UCL 2022-23 \nCentre for Advanced Spatial Analysis ')
+
+#ggsave(file="./slide_Age_Property_Type.svg", plot=slide_Age_Property_Type, width=15, height=8)
+#slide_Age_Property_Type
+```
+
+
+
+
+
+
+
+
+
+```{r Map}
+#Map Anything
+Map_example <- data[ ,  .(n = .N), by = c('ssimp_nn_construction_age_band','lad19cd') ]
+Map_example <- dcast(Map_example, paste('lad19cd', "~", 'ssimp_nn_construction_age_band'), value.var = 'n')
+Map_example$majority <- colnames(Map_example[,-(1),drop=FALSE])[max.col(Map_example[,-(1),drop=FALSE])]
+#Map_example$rowt <- rowSums(Map_example[,- (c(1,length(Map_example) ) )  ,drop=FALSE])
+basematrix <- subset( Map_example, select = -c(1, length(Map_example)) )
+Map_example$rowt <- rowSums(  basematrix  )
+
+Map_examplePercent <- round(basematrix/Map_example$rowt,2)*100
+#Map_examplePercent <- round(Map_example[,-(1),drop=FALSE]/Map_example$rowt,2)*100
+#Map_examplePercent$median <- round(median(mean(as.matrix(Map_examplePercent[,2:8]))))#dont need anymore
+Map_examplePercent$median <- round(median(mean(as.matrix(Map_examplePercent))))
+Map_example <- cbind.data.frame(Map_example,Map_examplePercent[,-(1),drop=FALSE] )
+
+
+
+
+
+#Map Anything
+Map_example <- data[ n_tenure != 'unknown',  .(n = .N), by = c('x_Tenure3_CEE_binary','lad19cd') ]
+Map_example <- dcast(Map_example, paste('lad19cd', "~", 'x_Tenure3_CEE_binary'), value.var = 'n')
+Map_example$majority <- colnames(Map_example[,-(1),drop=FALSE])[max.col(Map_example[,-(1),drop=FALSE])]
+#Map_example$rowt <- rowSums(Map_example[,- (c(1,length(Map_example) ) )  ,drop=FALSE])
+basematrix <- subset( Map_example, select = -c(1, length(Map_example)) )
+Map_example$rowt <- rowSums(  basematrix  )
+
+Map_examplePercent <- round(basematrix/Map_example$rowt,2)*100
+names(Map_examplePercent) <- paste('p%_',names(Map_examplePercent))
+#Map_examplePercent <- round(Map_example[,-(1),drop=FALSE]/Map_example$rowt,2)*100
+Map_examplePercent$median <- round(median(mean(as.matrix(Map_examplePercent))))
+Map_example <- cbind.data.frame(Map_example,Map_examplePercent[,-(1),drop=FALSE] )
+
+Map_example$plot_SubCRentPer_ <- Map_example$`p%_ rental (private) C-` + Map_example$`p%_ rental (social) C-`
+#about 20% is will need to change 
+median(Map_example$plot_SubCRentPer_)
+
+#write.csv(Map_example, './Tenure_C_binary_Map_example.csv')
+```
+
+```{r meta_data_table}
+cols <- names(data) # colnames
+cols_na <- sapply(data, function(x) sum(is.na(x)))
+
+#count of unique factors
+l_unique_factors <- sapply(data, function(x) length(unique(x)))
+test1 <- as.data.frame(l_unique_factors)
+test <- as.data.frame(do.call(cbind, test1))
+type <- sapply(data , function(x) typeof(x)) 
+
+cols <- cbind(names = names(data), 
+              type = type,
+              nas_counts = cols_na, 
+              factors = test)
+#write.csv(cols, './testMEdel.csv')
+
+```
+
+```{r choose factors}
+#get cols with 3-37 factprs
+
+interest_factors_cols <- cols[cols$l_unique_factors < 38 & cols$l_unique_factors > 2, 'names']
+
+#remove some
+interest_factors_cols <- setdiff(interest_factors_cols, c("CURRENT_ENERGY_RATING", "n_CEErel","n_CEIrel","n_CEE_binary",
+                                                          "CONSTRUCTION_AGE_BAND",# harmonised
+                                                          "TENURE", # harmonised
+                                                          "TRANSACTION_TYPE",# harmonised 
+                                                          "GLAZED_TYPE"#GLAZED_TYPE needs harmonising
+                                                          ))
+#add some
+interest_factors_cols <- c(interest_factors_cols, 
+                           'x_PropT3_Tenure3_Age8',
+                           'x_PropT3_Age8',
+                           'x_PropT3_Tenure3',
+                           'X_Tenure3_Age8',
+                           'x_Tenure3_habitable_rooms_grp10',
+                           'x_Tenure3_habitable_rooms_grp10_PropT3')
+```
+
+
+
+

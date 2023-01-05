@@ -1,0 +1,99 @@
+---
+title: "P3_CrossSectional_EDA"
+author: "Boyana Buyuklieva"
+date: "August 30, 2022"
+output: html_document
+---
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE, cache.lazy = FALSE)
+library(data.table)
+library(readr)
+
+#library(dplyr)
+#library(tidyverse)
+#library(foreign)
+#library(ggExtra)
+#library(gridExtra)
+
+source("../Outputs/Thesis_custom_scripts.R", local = knitr::knit_global())
+
+combi_SC_dt <- loadRData( "../Data/RData_crossSectional/_combi_SC_dt_big_crossSect_EPCs_cleaned_N16m984358.RData")
+```
+
+
+TODO:
+
+
+# NS Censorship
+
+Exclusions:
+
+X Built form unknown
+X Age unknown
+X 100 > EE & EEI > 0 [to fit into A - E], drops 'INVALID'. Then drop either nn_CEE_rating or CURRENT_ENERGY_RATING as these are the same. 
+X Park homes, to small to count
+X NUMBER_HABITABLE_ROOMS is NA or zero (loses 2M3 entries)
+- remove 1% of floor area, which is 276 m2  (loses 168 792 entries)
+
+Notes:
+- Terrace (Mid;End;Enclosed Mid & Enclosed End)
+- Flat (Flat & Maisonette)
+
+
+```{r}
+NS_dt <- combi_SC_dt
+
+NS_dt <- NS_dt[ !nn_construction_age_band == 'unknown']
+NS_dt <- NS_dt[ !nn_builtForm == 'unknown']
+
+NS_dt <- NS_dt[ CURRENT_ENERGY_EFFICIENCY > 0 ]
+NS_dt <- NS_dt[ CURRENT_ENERGY_EFFICIENCY < 101 ]
+
+NS_dt <- NS_dt[ ENVIRONMENT_IMPACT_CURRENT > 0 ]
+NS_dt <- NS_dt[ ENVIRONMENT_IMPACT_CURRENT < 101 ]
+NS_dt[, nn_CEE_rating := NULL ]
+#drop either nn_CEE_rating or CURRENT_ENERGY_RATING as these are the same after 0< values <101
+
+NS_dt <- NS_dt[ !n_propTyp == 'Park home' ]
+NS_dt <- NS_dt[ !is.na(NUMBER_HABITABLE_ROOMS) ]
+NS_dt <- NS_dt[ !NUMBER_HABITABLE_ROOMS == 0 ]
+
+maxthreshold <- round(quantile(NS_dt$TOTAL_FLOOR_AREA, 0.995, na.rm = T),0)
+maxthreshold # 99.5% = 330m2, NOTE: 99.9% = 509m2
+minthreshold <- round(quantile(NS_dt$TOTAL_FLOOR_AREA, 0.0001, na.rm = T),0) 
+minthreshold # 0.01%  = 10m2
+
+NS_dt <- NS_dt[ minthreshold < NS_dt$TOTAL_FLOOR_AREA,] 
+NS_dt <- NS_dt[ maxthreshold > NS_dt$TOTAL_FLOOR_AREA,] # drops a further ~ 166 758
+
+View( NS_dt[ TOTAL_FLOOR_AREA > 276 ,c('n_TOTAL_FLOOR_AREA', 'TOTAL_FLOOR_AREA'), with = F] )
+
+#save(NS_dt, file ="../Data/RData_crossSectional/_NS_dt_N14m377170.RData")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

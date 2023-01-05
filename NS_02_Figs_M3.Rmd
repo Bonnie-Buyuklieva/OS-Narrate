@@ -1,0 +1,351 @@
+---
+title: "NS_02_Scatter_Figs"
+author: "Bonnie Buyuklieva"
+date: "2022-10-26"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+source("../Outputs/Thesis_custom_scripts.R", local = knitr::knit_global())
+library(ggplot2)
+library(data.table)
+library(readr)
+
+
+#formatting:
+lettermapping <-  data.frame( letter = c('A','B','C','D','E','F','G'), 
+                              cutoff = c(92, 81, 69, 55, 39, 21, 0))
+
+NS_dt <- loadRData( "../Data/RData_crossSectional/_NS_dt_N14m377170.RData")
+```
+
+
+
+```{r}
+NS_dt1 <- NS_dt[, .SD[sample(.N, 300)], ]
+```
+my_colors <- c("yellow", "magenta", "cyan")
+```{r old3way-hist n_construction_age_band nn_builtForm nn_letter_Diff_CEE_EIC - noBungalow}
+mytitle = "Energy Efficiency vs Environmental Impact, by Morphology and Age"
+
+
+full_sample = lengths(NS_dt[nn_builtForm != 'Bungalow'][nn_letter_Diff_CEE_EIC != 'same letter rate'])[1]
+#plot_dt <- NS_dt[ , by = c('n_construction_age_band', 'nn_builtForm','nn_letter_Diff_CEE_EIC','nn_builtForm'),  .(n = .N)]
+
+
+NS_dt1[,n := .N][nn_builtForm != 'Bungalow'][nn_letter_Diff_CEE_EIC != 'same letter rate']
+
+
+
+  
+ggplot(NS_dt1[!nn_builtForm == 'Bungalow' & !nn_letter_Diff_CEE_EIC == 'same letter rate', n:=.N, by = c('nn_builtForm','n_construction_age_band','nn_letter_Diff_CEE_EIC')], 
+       aes(x= nn_letter_Diff_CEE_EIC, y=n, fill = nn_letter_Diff_CEE_EIC))+
+  #geom_bar()+
+  geom_bar(position="fill", stat="identity")+
+  #scale_y_continuous(labels = format(seq(12,12000, by = 1000), big.mark = ' '),
+  #                  breaks = seq(1200,1200000, by = 10000))+
+  facet_grid(n_construction_age_band  ~ nn_builtForm , scale = "free_y") +
+  #coord_flip()+
+  labs( x = 'Building Age', y = 'Number of properties in 100s' )+
+  theme_minimal()+
+  theme(axis.text.y = element_text(hjust = 1, size=6),
+        axis.text.x = element_text(angle = 90, hjust = 1, size=7),
+        legend.position="none")+
+  # theme(legend.position = 'bottom', legend.box = 'horizontal')+
+  labs(subtitle = paste0("n=", format(full_sample, big.mark = ' ') ) ) +
+  coord_flip()+
+  labs(title = mytitle, caption ='Author: Bonnie Buyuklieva, @Bonnie_0000 \n Project: OS Narrate, UCL 2022-23 \nCentre for Advanced Spatial Analysis ')
+
+ggsave(paste0("../Outputs/plots/",Sys.Date(),"_","Cross-sectional_EPC_Records_Histo", mytitle ,".png"), width = 30, height = 21, units = "cm" )
+```
+
+
+
+
+```{r old3way-hist n_construction_age_band nn_builtForm nn_letter_Diff_CEE_EIC - noBungalow}
+mytitle = "Energy Efficiency vs Environmental Impact, by Morphology and Age"
+
+
+full_sample = lengths(NS_dt[nn_builtForm != 'Bungalow'][nn_letter_Diff_CEE_EIC != 'same letter rate'])[1]
+#plot_dt <- NS_dt[ , by = c('n_construction_age_band', 'nn_builtForm','nn_letter_Diff_CEE_EIC','nn_builtForm'),  .(n = .N)]
+
+
+
+  
+ggplot(NS_dt1[nn_builtForm != 'Bungalow'][nn_letter_Diff_CEE_EIC != 'same letter rate'], aes(x= nn_letter_Diff_CEE_EIC, y=stat(count), fill = nn_letter_Diff_CEE_EIC))+
+  geom_bar()+
+  #scale_y_continuous(labels = format(seq(12,12000, by = 1000), big.mark = ' '),
+  #                  breaks = seq(1200,1200000, by = 10000))+
+  facet_grid(n_construction_age_band  ~ nn_builtForm , scale = "free_y") +
+  #coord_flip()+
+  labs( x = 'Building Age', y = 'Number of properties in 100s' )+
+  theme_minimal()+
+  theme(axis.text.y = element_text(hjust = 1, size=6),
+        axis.text.x = element_text(angle = 90, hjust = 1, size=7),
+        legend.position="none")+
+  # theme(legend.position = 'bottom', legend.box = 'horizontal')+
+  labs(subtitle = paste0("n=", format(full_sample, big.mark = ' ') ) ) +
+  coord_flip()+
+  labs(title = mytitle, caption ='Author: Bonnie Buyuklieva, @Bonnie_0000 \n Project: OS Narrate, UCL 2022-23 \nCentre for Advanced Spatial Analysis ')
+
+ggsave(paste0("../Outputs/plots/",Sys.Date(),"_","Cross-sectional_EPC_Records_Histo", mytitle ,".png"), width = 30, height = 21, units = "cm" )
+```
+
+```{r n_tenure}
+start.time <- Sys.time()
+full_sample <- lengths(NS_dt[n_tenure!='unknown'])[1]
+full_sample <- format(full_sample, big.mark = ' ')
+
+color <- 'n_tenure'
+color <- rlang::sym(color)
+
+ggplot(NS_dt[n_tenure!='unknown'], aes(CURRENT_ENERGY_EFFICIENCY, ENVIRONMENT_IMPACT_CURRENT))+
+  geom_smooth(method = "lm",
+                    #formula=y~0+x, # force though 
+                    se = FALSE,
+                    aes(color = factor(!!color)),
+                    size=.7) +
+  theme_minimal()+
+  scale_x_continuous( breaks= lettermapping$cutoff)+
+  scale_y_continuous( breaks= lettermapping$cutoff)+
+  annotate("text",x = lettermapping$cutoff+5, y= 0.1, label=lettermapping$letter, angle=90, size=5)+
+  annotate("text",y = lettermapping$cutoff+5, x= 0.1, label=lettermapping$letter, angle=90, size=5)+
+  labs(title = "", subtitle = paste0("Subset n=", full_sample) )+
+  labs(title = "Energy Efficiency vs Environmental Impact ", 
+       caption ='Author: Bonnie Buyuklieva, @Bonnie_0000 \n Project: OS Narrate, UCL 2022-23 \nCentre for Advanced Spatial Analysis ')+
+  labs(x = 'Current Energy Efficiency \n (better running cost)')+
+  labs(y = 'Current Environmental Impact \n (fewer C02 emissions)')+
+  scale_colour_brewer(palette = "Set1", direction = -1)+
+  theme(legend.position = 'bottom', legend.box = 'horizontal')+
+  theme(legend.title=element_blank())+
+  geom_abline(linetype = "dashed", size=1, fullrange = TRUE)
+
+
+
+
+ggsave(paste0("../Outputs/plots/20221027_SC_EPC_CEE_CEI_line_",color,".png" ), width = 27, height = 21, units = "cm" )
+print(paste('n_tenure', Sys.time() - start.time ))
+```
+
+
+
+```{r n_imd_grp}
+start.time <- Sys.time()
+full_sample <- lengths(NS_dt[n_imd_grp!='M.Average.4-7'][!is.na(n_imd_grp)])[1]
+full_sample <- format(full_sample, big.mark = ' ')
+
+color <- 'n_imd_grp'
+color <- rlang::sym(color)
+
+ggplot(NS_dt[n_imd_grp!='Average.4-7'][!is.na(n_imd_grp)], aes(CURRENT_ENERGY_EFFICIENCY, ENVIRONMENT_IMPACT_CURRENT))+
+  geom_smooth(method = "lm",
+                    #formula=y~0+x, # force though 
+                    se = FALSE,
+                    aes(color = factor(!!color)),
+                    size=.7) +
+  theme_minimal()+
+  scale_x_continuous( breaks= lettermapping$cutoff)+
+  scale_y_continuous( breaks= lettermapping$cutoff)+
+  annotate("text",x = lettermapping$cutoff+5, y= 0.1, label=lettermapping$letter, angle=90, size=5)+
+  annotate("text",y = lettermapping$cutoff+5, x= 0.1, label=lettermapping$letter, angle=90, size=5)+
+  labs(title = "", subtitle = paste0("Subset n=", full_sample) )+
+  labs(title = "Energy Efficiency vs Environmental Impact ", 
+       caption ='Author: Bonnie Buyuklieva, @Bonnie_0000 \n Project: OS Narrate, UCL 2022-23 \nCentre for Advanced Spatial Analysis ')+
+  labs(x = 'Current Energy Efficiency \n (better running cost)')+
+  labs(y = 'Current Environmental Impact \n (fewer C02 emissions)')+
+  scale_colour_brewer(palette = "Set1", direction = -1)+
+  theme(legend.position = 'bottom', legend.box = 'horizontal')+
+  theme(legend.title=element_blank())+
+  geom_abline(linetype = "dashed", size=1, fullrange = TRUE)
+
+
+
+
+ggsave(paste0("../Outputs/plots/20221027_SC_EPC_CEE_CEI_line_",color,".png" ), width = 27, height = 21, units = "cm" )
+print(paste('n_imd_grp', Sys.time() - start.time ))
+```
+
+
+```{r n_imd_grp CCE_PD}
+start.time <- Sys.time()
+colour <- 'nn_builtFormXn_imd_grp'
+
+threeway_probability_density_Crel(dat = NS_dt[!n_imd_grp=='M.Average.4-7'][!is.na(n_imd_grp)],
+                                   x.var = 'CURRENT_ENERGY_EFFICIENCY',
+                                   facet.y.var = 'n_imd_grp',
+                                   facet.x.var = 'nn_builtForm')+
+  theme(legend.title=element_blank())+
+  scale_x_continuous(name = 'Current Energy Efficiency' , breaks= lettermapping$cutoff)+
+  labs(title = "Current Energy Efficiency by Deprivation and Built Form", 
+       caption ='Author: Bonnie Buyuklieva, @Bonnie_0000 \n Project: OS Narrate, UCL 2022-23 \nCentre for Advanced Spatial Analysis ')
+
+ggsave(paste0("../Outputs/plots/20221027_SC_EPC_CEE_PD_",color,".png" ), width = 27, height = 21, units = "cm" )
+Sys.time() - start.time
+```
+
+
+```{r n_imd_grp_Deprived_Fig2_Pt1_historgram_by_age_band}
+ggplot(dat = NS_dt[!n_imd_grp=='M.Average.4-7'][!n_imd_grp=='M.UnDeprived.8-10'][!is.na(n_imd_grp)], 
+       aes(x= nn_construction_age_band, y=stat(count), fill = nn_construction_age_band))+
+  geom_bar()+
+  facet_grid(nn_builtForm ~ PROPERTY_TYPE, scale = "free_y") +
+  #coord_flip()+
+  labs( x = 'Building Age', y = 'Number of properties in 100s' )+
+  theme_minimal()+
+  theme(axis.text.y = element_text(hjust = 1, size=6),
+        axis.text.x = element_text(angle = 90, hjust = 1, size=7),
+        legend.position="none")+
+  labs(subtitle = paste0("n=", format(full_sample, big.mark = ' ') ) ) +
+  labs(title = "Building Characteristics of Cross-sectional EPC Records, Affluent Areas", caption ='Author: Bonnie Buyuklieva, @Bonnie_0000 \n Project: OS Narrate, UCL 2022-23 \nCentre for Advanced Spatial Analysis ')
+
+ggsave(paste0("../Outputs/plots/20221027_SC_EPC_CEE_Histo_",color,".png" ), width = 27, height = 21, units = "cm" )
+
+```
+
+
+```{r n_imd_grp UnDeprived Fig2_Pt1_historgram_by_age_band}
+ggplot(dat = NS_dt[!n_imd_grp=='M.Average.4-7'][!n_imd_grp=='M.Deprived.1-3'][!is.na(n_imd_grp)], 
+       aes(x= nn_construction_age_band, y=stat(count), fill = nn_construction_age_band))+
+  geom_bar()+
+  facet_grid(nn_builtForm ~ PROPERTY_TYPE, scale = "free_y") +
+  #coord_flip()+
+  labs( x = 'Building Age', y = 'Number of properties in 100s' )+
+  theme_minimal()+
+  theme(axis.text.y = element_text(hjust = 1, size=6),
+        axis.text.x = element_text(angle = 90, hjust = 1, size=7),
+        legend.position="none")+
+  labs(subtitle = paste0("n=", format(full_sample, big.mark = ' ') ) ) +
+  labs(title = "Building Characteristics of Cross-sectional EPC Records, Deprived Areas", caption ='Author: Bonnie Buyuklieva, @Bonnie_0000 \n Project: OS Narrate, UCL 2022-23 \nCentre for Advanced Spatial Analysis ')
+
+ggsave(paste0("../Outputs/plots/20221027_SC_EPC_CEE_Histo_",color,".png" ), width = 27, height = 21, units = "cm" )
+
+```
+
+
+
+```{r ruc11ind_grp}
+start.time <- Sys.time()
+full_sample <- lengths(NS_dt[!is.na(ruc11ind_grp)])[1]
+full_sample <- format(full_sample, big.mark = ' ')
+
+color <- 'ruc11ind_grp'
+color <- rlang::sym(color)
+
+ggplot(NS_dt[!is.na(ruc11ind_grp)], aes(CURRENT_ENERGY_EFFICIENCY, ENVIRONMENT_IMPACT_CURRENT))+
+  geom_smooth(method = "lm",
+                    #formula=y~0+x, # force though 
+                    se = FALSE,
+                    aes(color = factor(!!color)),
+                    size=.7) +
+  theme_minimal()+
+  scale_x_continuous( breaks= lettermapping$cutoff)+
+  scale_y_continuous( breaks= lettermapping$cutoff)+
+  annotate("text",x = lettermapping$cutoff+5, y= 0.1, label=lettermapping$letter, angle=90, size=5)+
+  annotate("text",y = lettermapping$cutoff+5, x= 0.1, label=lettermapping$letter, angle=90, size=5)+
+  labs(title = "", subtitle = paste0("Subset n=", full_sample) )+
+  labs(title = "Energy Efficiency vs Environmental Impact ", 
+       caption ='Author: Bonnie Buyuklieva, @Bonnie_0000 \n Project: OS Narrate, UCL 2022-23 \nCentre for Advanced Spatial Analysis ')+
+  labs(x = 'Current Energy Efficiency \n (better running cost)')+
+  labs(y = 'Current Environmental Impact \n (fewer C02 emissions)')+
+  scale_colour_brewer(palette = "Set1", direction = -1)+
+  theme(legend.position = 'bottom', legend.box = 'horizontal')+
+  theme(legend.title=element_blank())+
+  geom_abline(linetype = "dashed", size=1, fullrange = TRUE)
+
+
+
+
+ggsave(paste0("../Outputs/plots/20221027_SC_EPC_CEE_CEI_line_",color,".png" ), width = 27, height = 21, units = "cm" )
+print(paste('ruc11ind_grp', Sys.time() - start.time ))
+```
+
+# urban
+
+# rural 
+
+
+```{r scatter_setting}
+scatter_setting <- '_pts'
+ptsize = 1.1 
+```
+
+```{r n_imd_grp_scatter}
+start.time <- Sys.time()
+full_sample <- lengths(NS_dt[n_imd_grp!='Average.4-7'][!is.na(n_imd_grp)])[1]
+full_sample <- format(full_sample, big.mark = ' ')
+
+color <- 'n_imd_grp'
+color <- rlang::sym(color)
+
+ggplot(NS_dt[!n_imd_grp=='Average.4-7'][!is.na(n_imd_grp)], aes(CURRENT_ENERGY_EFFICIENCY, ENVIRONMENT_IMPACT_CURRENT))+
+   geom_point(aes(color = !!color, 
+                alpha = 0.001,
+                stroke = 0.001),
+                size = ptsize) +
+  geom_smooth(method = "lm",
+                    #formula=y~0+x, # force though 
+                    se = FALSE,
+                    aes(color = factor(!!color)),
+                    size=.7) +
+  theme_minimal()+
+  scale_x_continuous( breaks= lettermapping$cutoff)+
+  scale_y_continuous( breaks= lettermapping$cutoff)+
+  annotate("text",x = lettermapping$cutoff+5, y= 0.1, label=lettermapping$letter, angle=90, size=5)+
+  annotate("text",y = lettermapping$cutoff+5, x= 0.1, label=lettermapping$letter, angle=90, size=5)+
+  labs(title = "", subtitle = paste0("Subset n=", full_sample) )+
+  labs(title = "Energy Efficiency vs Environmental Impact ", 
+       caption ='Author: Bonnie Buyuklieva, @Bonnie_0000 \n Project: OS Narrate, UCL 2022-23 \nCentre for Advanced Spatial Analysis ')+
+  labs(x = 'Current Energy Efficiency \n (better running cost)')+
+  labs(y = 'Current Environmental Impact \n (fewer C02 emissions)')+
+  scale_colour_brewer(palette = "Set1", direction = -1)+
+  theme(legend.position = 'bottom', legend.box = 'horizontal')+
+  theme(legend.title=element_blank())+
+  geom_abline(linetype = "dashed", size=1, fullrange = TRUE)
+
+
+
+
+ggsave(paste0("../Outputs/plots/20221027_SC_EPC_CEE_CEI_scatter_", color, scatter_setting, ptsize,".png" ), width = 27, height = 21, units = "cm" )
+print(paste('n_imd_grp', Sys.time() - start.time ))
+```
+
+```{r ruc11ind_grp_scatter}
+start.time <- Sys.time()
+full_sample <- lengths( NS_dt[!is.na(ruc11ind_grp)])[1]
+full_sample <- format(full_sample, big.mark = ' ')
+
+color <- 'ruc11ind_grp'
+color <- rlang::sym(color)
+
+ggplot(NS_dt[!is.na(ruc11ind_grp)], aes(CURRENT_ENERGY_EFFICIENCY, ENVIRONMENT_IMPACT_CURRENT))+
+   geom_point(aes(color = !!color, 
+                alpha = 0.001,
+                stroke = 0.001),
+                size = ptsize) +
+  geom_smooth(method = "lm",
+                    #formula=y~0+x, # force though 
+                    se = FALSE,
+                    aes(color = factor(!!color)),
+                    size=.7) +
+  theme_minimal()+
+  scale_x_continuous( breaks= lettermapping$cutoff)+
+  scale_y_continuous( breaks= lettermapping$cutoff)+
+  annotate("text",x = lettermapping$cutoff+5, y= 0.1, label=lettermapping$letter, angle=90, size=5)+
+  annotate("text",y = lettermapping$cutoff+5, x= 0.1, label=lettermapping$letter, angle=90, size=5)+
+  labs(title = "", subtitle = paste0("Subset n=", full_sample) )+
+  labs(title = "Energy Efficiency vs Environmental Impact ", 
+       caption ='Author: Bonnie Buyuklieva, @Bonnie_0000 \n Project: OS Narrate, UCL 2022-23 \nCentre for Advanced Spatial Analysis ')+
+  labs(x = 'Current Energy Efficiency \n (better running cost)')+
+  labs(y = 'Current Environmental Impact \n (fewer C02 emissions)')+
+  scale_colour_brewer(palette = "Set1", direction = -1)+
+  theme(legend.position = 'bottom', legend.box = 'horizontal')+
+  theme(legend.title=element_blank())+
+  geom_abline(linetype = "dashed", size=1, fullrange = TRUE)
+
+
+
+
+ggsave(paste0("../Outputs/plots/20221027_SC_EPC_CEE_CEI_scatter_", color, scatter_setting, ptsize,".png" ), width = 27, height = 21, units = "cm" )
+print(paste('ruc11ind_grp', Sys.time() - start.time ))
+```

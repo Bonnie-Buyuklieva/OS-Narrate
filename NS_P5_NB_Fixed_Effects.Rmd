@@ -1,0 +1,225 @@
+---
+title: "P5_Descriptives"
+author: "Bonnie Buyuklieva"
+date: "2022-11-07"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+options(scipen=999)
+library(data.table)
+library(ggplot2)
+library(readr)
+library(lme4)
+library(jtools)
+
+
+source("../Outputs/Thesis_custom_scripts.R", local = knitr::knit_global())
+data <- loadRData( "../Data/RData_crossSectional/_NS_dt_N14m377170.RData")
+#dataCS <- loadRData( "../Data/RData_crossSectional/_combi_SC_dt_big_crossSect_EPCs_cleaned_N16m984358.RData")
+
+
+
+#SAP Climatic Regions - move to 00_P3
+climatic <- as.data.table(read_csv("../Data/m_SAP_climatic_May_2020_combined.csv"))
+climatic$lad19cd <- climatic$lad20cd 
+data[climatic,  on = 'lad19cd', SAP_climate_grp := SAP_climat]
+
+#Add SAP version
+data[ , SAP_version := year(INSPECTION_DATE)]
+#contains some INSPECTION_DATE nas
+data[ , SAP_version := ifelse(SAP_version < 2005 , 'SAP05', ifelse(SAP_version < 2009, 'SAP09', 'SAP12'))]
+
+#Adjust Age
+#possibly remove nn_construction_age_band
+data[ , inspection_yr := year(INSPECTION_DATE)]
+#1 issue: '216525930262009012815361707988770', 2007 onward, but inspected in 2000
+#View(data[ ,  .(n = .N), by = c('n_construction_age_band','inspection_yr')])
+data[ , nnn_construction_age_band := n_construction_age_band]
+data[ nnn_construction_age_band == "2007 onwards", nnn_construction_age_band := ifelse(inspection_yr < 2012, '2007-2011', ifelse( inspection_yr > 2011, "2012 onwards" ,"unknown" ) )]
+data[ , nnn_construction_age_band := droplevels(nnn_construction_age_band)] #rm,"2007 onwards"
+#might need to relevel
+
+```
+
+
+
+# Key variables:
+```{r , echo=FALSE}
+plotdata <- data[ ,  .(n = .N), by = c('nnn_construction_age_band') ]
+ggplot(plotdata, aes(x=nnn_construction_age_band, y = n)) + 
+ geom_bar(stat="identity")+ theme_minimal()+coord_flip()
+
+#11 age groups
+ggplot(data=data[ ,.SD[sample(.N,300)] ], aes(x=nnn_construction_age_band, y=CURRENT_ENERGY_EFFICIENCY)) +
+  geom_boxplot()+ theme_minimal()+coord_flip()
+
+```
+
+
+```{r}
+plotdata <- data[ ,  .(n = .N), by = c('x_simp_nn_builtFormXn_propTyp') ]
+ggplot(data=plotdata, aes(x=x_simp_nn_builtFormXn_propTyp, y=n)) +
+  geom_bar(stat="identity")+ theme_minimal()+coord_flip()
+
+#5 morpho groups
+ggplot(data=data[ ,.SD[sample(.N,300)] ], aes(x=x_simp_nn_builtFormXn_propTyp, y=CURRENT_ENERGY_EFFICIENCY)) +
+  geom_boxplot()+ theme_minimal()+coord_flip()
+
+
+#Hard to intepret
+#ggplot(data=data[ ,.SD[sample(.N,300)] ], aes(x=x_nn_builtFormXn_propTyp, y=CURRENT_ENERGY_EFFICIENCY)) +
+#  geom_boxplot()+ theme_minimal()+coord_flip()
+
+```
+
+
+
+
+
+
+```{r M0_emptyModel}
+start.t <- Sys.time()
+m0 <- lm(formula = CURRENT_ENERGY_EFFICIENCY ~ NULL, data = data)
+#m0 <- lmer(formula = CURRENT_ENERGY_EFFICIENCY ~ 1, data = data)
+#No random effects terms specified in formula
+Sys.time() - start.t
+
+m0 
+#plot intercept on histogram
+```
+
+```{r M0_histogram, echo=FALSE}
+#All EPCS histo
+lettermapping <-  data.frame( letter = c('A','B','C','D','E','F','G'), 
+                              cutoff = c(92, 81, 69, 55, 39, 21, 0))
+
+ggplot() + geom_histogram(data = data[RGN11NM == 'London'], 
+                              aes(CURRENT_ENERGY_EFFICIENCY , alpha=0.9 ),
+                              binwidth = 1)+
+  geom_vline( xintercept =  lettermapping$cutoff, colour = 'grey', size=.6)+ 
+  annotate("text",x = lettermapping$cutoff+5, y= 0.1, label=lettermapping$letter, angle=90, size=5)+
+  #theme_classic() +
+  theme_minimal()+
+  theme(legend.position = 'bottom', legend.box = 'horizontal')+
+  scale_x_continuous(name = 'Current Energy Efficiency' , breaks= lettermapping$cutoff)+
+  #scale_y_continuous(name = 'Count of EPCs' ,breaks=seq(0,100000,10000))+
+  theme(legend.position="none")+
+  labs(title = '                                              empty model (mean)',
+         tag = paste0("N = ", format(lengths(data)[1], big.mark=" ", trim=TRUE)) ) +
+  geom_vline(xintercept = m0$coefficients, colour = 'red', size = 1) 
+```
+
+# Baseline Regressions
+
+
+
+
+Ordered vs unorderd factor: [R's default is to fit a series of polynomial functions or contrasts to the levels of the variable. The first is linear (.L), the second is quadratic (.Q), the third is cubic (.C), and so on](https://stackoverflow.com/questions/57297771/interpretation-of-l-q-c-4-for-logistic-regression)
+
+M1 as ordered: 
+```{r M1_age_PTBF_vars_2_ordered , echo=FALSE, results='hide'}
+#x_simp_nn_builtFormXn_propTyp[5]
+#nnn_construction_age_band[12]
+
+start.t <- Sys.time()
+m1 <- lm( formula = CURRENT_ENERGY_EFFICIENCY ~ nnn_construction_age_band + x_simp_nn_builtFormXn_propTyp, data = data)
+Sys.time() - start.t #< 1min
+
+summ(m1)
+```
+
+```{r , echo=FALSE}
+summary(m1)
+```
+
+
+#Unordered:
+M1, unordered: 
+
+## 2 Variable
+```{r M1_age_PTBF_vars_2, echo=FALSE, results='hide'}
+#x_simp_nn_builtFormXn_propTyp[5]
+#nnn_construction_age_band[12]
+fit <- data[ , .(CURRENT_ENERGY_EFFICIENCY, nnn_construction_age_band = factor( nnn_construction_age_band , ordered = FALSE ), 
+                 x_simp_nn_builtFormXn_propTyp = factor( x_simp_nn_builtFormXn_propTyp , ordered = FALSE )) ]
+
+start.t <- Sys.time()
+m1 <- lm( formula = CURRENT_ENERGY_EFFICIENCY ~ nnn_construction_age_band + x_simp_nn_builtFormXn_propTyp, data = fit)
+Sys.time() - start.t #< 1min
+
+summ(m1)
+```
+
+```{r , echo=FALSE}
+summary(m1)
+```
+
+## 4 Variable
+
+```{r M2_age_PTBF__SAP_climate_date_vars_4}
+fit <- data[ , .(CURRENT_ENERGY_EFFICIENCY, 
+                 nnn_construction_age_band = factor( nnn_construction_age_band , ordered = FALSE ), 
+                 x_simp_nn_builtFormXn_propTyp = factor( x_simp_nn_builtFormXn_propTyp , ordered = FALSE ),
+                 SAP_version = factor( SAP_version , ordered = FALSE ),
+                 SAP_climate_grp = factor( SAP_climate_grp , ordered = FALSE) ) ]
+
+
+start.t <- Sys.time()
+m2 <- lm( formula = CURRENT_ENERGY_EFFICIENCY ~ nnn_construction_age_band + x_simp_nn_builtFormXn_propTyp + SAP_version + SAP_climate_grp , data = fit)
+Sys.time() - start.t
+```
+
+```{r , echo=FALSE}
+summary(m2)
+```
+
+## 5 Variable
+
+```{r M2_age_PTBF__SAP_climate_date__LAD_vars_5}
+fit <- data[ , .(CURRENT_ENERGY_EFFICIENCY, 
+                 nnn_construction_age_band = factor( nnn_construction_age_band , ordered = FALSE ), 
+                 x_simp_nn_builtFormXn_propTyp = factor( x_simp_nn_builtFormXn_propTyp , ordered = FALSE ),
+                 SAP_version, SAP_climate_grp,
+                 LAD11NM) ]
+
+
+start.t <- Sys.time()
+m3 <- lm( formula = CURRENT_ENERGY_EFFICIENCY ~ nnn_construction_age_band + x_simp_nn_builtFormXn_propTyp + SAP_version + SAP_climate_grp + LAD11NM, data = fit)
+Sys.time() - start.t
+```
+
+```{r , echo=FALSE}
+summary(m3)
+```
+
+
+
+# Unordered factors, by Tenure
+```{r}
+fit <- data[ , .(CURRENT_ENERGY_EFFICIENCY, 
+                 nnn_construction_age_band = factor( nnn_construction_age_band , ordered = FALSE ), 
+                 x_simp_nn_builtFormXn_propTyp = factor( x_simp_nn_builtFormXn_propTyp , ordered = FALSE ), SAP_version, SAP_climate_grp, LAD11NM, n_tenure) ]
+
+
+start.t <- Sys.time()
+m2 <- lm( formula = CURRENT_ENERGY_EFFICIENCY ~ nnn_construction_age_band + x_simp_nn_builtFormXn_propTyp + SAP_version + SAP_climate_grp + LAD11NM, data = fit[ n_tenure ==  "rental (social)",])
+Sys.time() - start.t
+
+
+```
+
+```{r, echo=FALSE}
+
+try(plot_summs(m1, m2))
+
+```
+
+
+
+
+
+
+
+
