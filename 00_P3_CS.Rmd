@@ -171,9 +171,8 @@ Tenure, Built form, Age & Transaction
 ```{r change_col_based_on_LUTs}
 #Editing Variables should be done in the excel sheets!
 #get loopUp
-LUT_TENURE <- read_excel("../Data/OS-N_EPC_v10_LUT+dictionaries.xlsx", sheet = "TENURE",range = cell_cols("B:C"))
-LUT_PROPERTY_TYPE <- read_excel("../Data/OS-N_EPC_v10_LUT+dictionaries.xlsx", sheet = "PROPERTY_TYPE",range = cell_cols("B:C"))
-LUT_TRANSACTION_TYPE <- read_excel("../Data/OS-N_EPC_v10_LUT+dictionaries.xlsx", sheet = "TRANSACTION_TYPE",range = cell_cols("B:C"))
+LUT_TENURE <- read_excel("../Data/_metaData/OS-N_EPC_v10_LUT+dictionaries.xlsx", sheet = "TENURE",range = cell_cols("B:C"))
+LUT_PROPERTY_TYPE <- read_excel("../Data/_metaData/OS-N_EPC_v10_LUT+dictionaries.xlsx", sheet = "PROPERTY_TYPE",range = cell_cols("B:C"))
 
 
 #TENURE
@@ -189,17 +188,27 @@ combi_SC_dt[,n_propTyp := LUT_colum]
 combi_SC_dt[is.na(n_propTyp),n_propTyp := 'unknown'] 
 fct <- c('Flat','House','Bungalow','Park home')
 combi_SC_dt[,n_propTyp := factor(n_propTyp, levels = fct, ordered = T)]
+```
+
+```{r}
+LUT_TRANSACTION_TYPE <- read_excel("../Data/_metaData/OS-N_EPC_v10_LUT+dictionaries.xlsx", sheet = "TRANSACTION_TYPE",range = cell_cols("B:E"))
 
 #TRANSACTION_TYPE
 LUT_colum <- LUT_TRANSACTION_TYPE[match(combi_SC_dt$TRANSACTION_TYPE, LUT_TRANSACTION_TYPE$TRANSACTION_TYPEfactors),"harmonisation"]
 combi_SC_dt[,n_transactTyp := LUT_colum]
 combi_SC_dt[is.na(n_transactTyp),n_transactTyp := 'unknown'] 
+
+#TRANSACTION_TYPE
+LUT_colum <- LUT_TRANSACTION_TYPE[match(combi_SC_dt$n_transactTyp, LUT_TRANSACTION_TYPE$TRANSACTION_TYPEharm),"TRANSACTION_TYPE_harmSimple"]
+combi_SC_dt[,nn_transactTyp := LUT_colum]
+combi_SC_dt[is.na(nn_transactTyp),nn_transactTyp := 'unknown']  
 ```
+
 
 ```{r builtform}
 #N: create new Built Form column
 #Old levels: "unknown","End-Terrace","Detached","Mid-Terrace", "Semi-Detached"
-LUT_BUILT_FORM <- read_excel("../Data/OS-N_EPC_v10_LUT+dictionaries.xlsx", sheet = "BUILT_FORM",range = cell_cols("B:D"))
+LUT_BUILT_FORM <- read_excel("../Data/_metaData/OS-N_EPC_v10_LUT+dictionaries.xlsx", sheet = "BUILT_FORM",range = cell_cols("B:D"))
 LUT_colum <- LUT_BUILT_FORM[match(combi_SC_dt$BUILT_FORM, LUT_BUILT_FORM$BUILT_FORMfactors),"harmonisation_det"]
 combi_SC_dt[,n_builtForm := LUT_colum]
 combi_SC_dt[is.na(n_builtForm),n_builtForm := 'unknown'] 
@@ -222,7 +231,7 @@ combi_SC_dt[,n_builtForm := factor(nn_builtForm, levels = fct, ordered = T)]
 ```{r age band}
 #AGE_BAND
 #age from 2007 is ambigious
-LUT_AGE_BAND <- read_excel("../Data/OS-N_EPC_v10_LUT+dictionaries.xlsx", sheet = "CONSTRUCTION_AGE_BAND",range = cell_cols("B:D"))
+LUT_AGE_BAND <- read_excel("../Data/_metaData/OS-N_EPC_v10_LUT+dictionaries.xlsx", sheet = "CONSTRUCTION_AGE_BAND",range = cell_cols("B:D"))
 LUT_colum <- LUT_AGE_BAND[match(combi_SC_dt$CONSTRUCTION_AGE_BAND, LUT_AGE_BAND$CONSTRUCTION_AGE_BANDfactors), "harmonisation_det"]
 combi_SC_dt[,n_construction_age_band := LUT_colum]
 combi_SC_dt[is.na(n_construction_age_band),n_construction_age_band := 'unknown'] #deals with NAs
@@ -433,48 +442,107 @@ combi_SC_dt[ ,ruc11ind_grp:= ifelse( ruc11ind == 'C2', 'urban', ruc11ind_grp )]
 
 
 ```{r}
+if(F){
 #Date added: Nov 10th
 combi_SC_dt[ ,x_PropT3_Tenure3_Age8:= paste(ssimp_nn_construction_age_band,"x",n_propTyp,"x",n_tenure)]
 combi_SC_dt[ ,x_PropT3_Age8:= paste(n_propTyp,"x",ssimp_nn_construction_age_band)]
-
 
 combi_SC_dt[ ,x_PropT3_Tenure3:= paste(n_propTyp,"x",n_tenure)]
 combi_SC_dt[ ,X_Tenure3_Age8:= paste(n_tenure,"x",ssimp_nn_construction_age_band)]
 
 combi_SC_dt[ ,x_Tenure3_habitable_rooms_grp10:= paste(n_tenure,"x", n_habitable_rooms_grp)]
 combi_SC_dt[ ,x_Tenure3_habitable_rooms_grp10_PropT3:= paste(n_tenure,"x", n_propTyp,"x", n_habitable_rooms_grp)]
+}
 
-combi_SC_dt[,n_CEE_binary := n_CEErel]
+
+
+combi_SC_dt[,n_CEErel_binary := n_CEErel]
 fct <- c("C & C+","C & C+","C-")
-levels(combi_SC_dt$n_CEE_binary) <- fct
-combi_SC_dt[,n_CEE_binary := factor(n_CEE_binary, levels = unique(fct), ordered = T)]
+levels(combi_SC_dt$n_CEErel_binary) <- fct
+combi_SC_dt[,n_CEErel_binary := factor(n_CEErel_binary, levels = unique(fct), ordered = T)]
 
-combi_SC_dt[ ,x_Tenure3_CEE_binary:= paste(n_tenure,"x", n_CEE_binary)]
+combi_SC_dt[ ,x_Tenure3_CEE_binary:= paste(n_tenure,"x", n_CEErel_binary)]
 
 
 
 combi_SC_dt[ , EXTENSION_COUNT:= as.numeric(EXTENSION_COUNT), ]
 ```
 
-```{r}
-out <- sapply(combi_SC_dt, typeof)
-out <- cbind.data.frame(names(combi_SC_dt), out)
 
+```{r climatic_Regions}
+#SAP Climatic Regions - move to 00_P3
+climatic <- as.data.table(read_csv("../Data/m_SAP_climatic_May_2020_combined.csv"))
+climatic$lad19cd <- climatic$lad20cd 
+combi_SC_dt[climatic,  on = 'lad19cd', SAP_climate_grp := SAP_climat]
+
+#Add SAP version
+combi_SC_dt[ , SAP_version := year(INSPECTION_DATE)]
+#contains some INSPECTION_DATE nas
+combi_SC_dt[ , SAP_version := ifelse(SAP_version < 2005 , 'SAP05', ifelse(SAP_version < 2009, 'SAP09', 'SAP12'))]
+
+#Adjust Age
+#possibly remove nn_construction_age_band
+combi_SC_dt[ , inspection_yr := year(INSPECTION_DATE)]
+#1 issue: '216525930262009012815361707988770', 2007 onward, but inspected in 2000
+#View(combi_SC_dt[ ,  .(n = .N), by = c('n_construction_age_band','inspection_yr')])
+combi_SC_dt[ , nnn_construction_age_band12 := n_construction_age_band]
+combi_SC_dt[ nnn_construction_age_band12 == "2007 onwards", nnn_construction_age_band12 := ifelse(inspection_yr < 2012, '2007-2011', ifelse( inspection_yr > 2011, "2012 onwards" ,"unknown" ) )]
+combi_SC_dt[ , nnn_construction_age_band12 := droplevels(nnn_construction_age_band12)] #rm,"2007 onwards"
+#might need to relevel
+```
+
+```{r}
+#Resolves issue of LAD and RGNs, some 4k rows are still unresolved. See TODO folder
+
+#Assign the most recent LA, based on UPRN data
+combi_SC_dt[,m_EPC_lad19cd := ifelse(is.na(lad19cd), LOCAL_AUTHORITY, lad19cd)]
+combi_SC_dt[,m_EPC_lad19cd := ifelse(m_EPC_lad19cd == "", NA, m_EPC_lad19cd)]
+#sum(is.na(combi_SC_dt$m_EPC_lad19cd)) #check that = 0
+#remove "LOCAL_AUTHORITY" from the folders, but save a boolean
+combi_SC_dt[,tmp_EPC_LA_folder_info := ifelse( lad19cd == LOCAL_AUTHORITY, 'lad19cd == LOCAL_AUTHORITY', LOCAL_AUTHORITY)]
+combi_SC_dt[,LOCAL_AUTHORITY := NULL]
+combi_SC_dt[,LAD11NM := NULL]#realted to LOCAL_Authority
+combi_SC_dt[,RGN11NM := NULL]
+
+#Add the new geogs: LAD19, RGN19, CTRY19
+lad_rgn_2019 <- as.data.table(read_csv("../Data/_shapefiles/lad19cd-rgn19nm/m_lad_rgn_2019.csv"))
+setkey(lad_rgn_2019, m_EPC_lad19cd)
+setkey(combi_SC_dt, m_EPC_lad19cd)
+combi_SC_dt <- lad_rgn_2019[combi_SC_dt, on = 'm_EPC_lad19cd',]
+
+
+```
+
+
+
+#End
+
+```{r}
+#
+save(combi_SC_dt, file ="../Data/RData_crossSectional/_combi_SC_dt_big_crossSect_EPCs_cleaned_N16m984358.RData")
+#Adds date #
+metaDataCSV( combi_SC_dt , "combi_SC_dt_N16m984358", dir = "../Data/_metaData/CSV_")
+
+#combi_SC_dt <- loadRData("../Data/RData_crossSectional/_combi_SC_dt_big_crossSect_EPCs_cleaned_N16m984358.RData")
+```
+
+```{r}
+out <- sapply(combi_SC_dt, function(x){  gsub(',',' ',toString(class(x))) })
+out <- cbind.data.frame(name = names(combi_SC_dt), class = out)
+out$unique <- sapply(combi_SC_dt, function(x){ ifelse(typeof(x) != 'character' ,NA , length(unique(x)))})
+
+getuniquevals_under200 <- function(x){ifelse(typeof(x) == 'character', ifelse(length(unique(x)) < 200, toString(unique(x)), NA), NA)}
+out$uniques_under_200 <- sapply(combi_SC_dt[], getuniquevals_under200)
 out$sample1 <- t(combi_SC_dt[1,])
 out$sample2 <- t(combi_SC_dt[2,])
 out$sample3 <- t(combi_SC_dt[3,])
 
-if(T){
-write.csv(out, file = "../Data/RData_crossSectional/combi_SC_dt_cols.csv")  
-}
+
+date <- format(Sys.Date(), '%Y_%m%d')
+write.csv(out, file =paste0("../Data/RData_crossSectional/combi_SC_dt_cols_",date,".csv") )  
 ```
 
 
-
-```{r}
-#save(combi_SC_dt, file ="../Data/RData_crossSectional/_combi_SC_dt_big_crossSect_EPCs_cleaned_N16m984358.RData") 
-#combi_SC_dt <- loadRData("../Data/RData_crossSectional/_combi_SC_dt_big_crossSect_EPCs_cleaned_N16m984358.RData")
-```
 
 
 

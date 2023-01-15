@@ -15,7 +15,6 @@ source("../Outputs/Thesis_custom_scripts.R", local = knitr::knit_global())
 ```
 
 
-
 ```{r path}
 # #check folders here:
 # folders <- list.files(path = "../Data/all-domestic-certificates", pattern = NULL, all.files = FALSE,
@@ -29,9 +28,24 @@ LAD_region_LUT <- read_excel("../Data/LAD_region_LUT.xlsx")
 folders <-  LAD_region_LUT$folder_name
 ```
 
+
+
+```{r building_element}
+building_element <- c( 'GLAZED_TYPE','HOTWATER_DESCRIPTION','FLOOR_DESCRIPTION','WINDOWS_DESCRIPTION',
+                     'WALLS_DESCRIPTION','SECONDHEAT_DESCRIPTION','ROOF_DESCRIPTION','MAINHEAT_DESCRIPTION',
+                     'MAINHEATCONT_DESCRIPTION','LIGHTING_DESCRIPTION')
+
+for (col in building_element) {
+  print(col)
+  tmp_LUT <- entries_to_factors(column_to_extract_factors_from = col)
+  write.xlsx(tmp_LUT,
+             file = "../Data/OS-N_EPC_v10_LUT+dictionaries.xlsx", sheetName=col, append=TRUE)
+}
+```
+
+
+
 #Counting on CSV Directory
-
-
 ```{r Generate many_LUTS}
 source("../Outputs/Thesis_custom_scripts.R", local = knitr::knit_global())
 library("readxl")
@@ -77,9 +91,6 @@ if(F){
 }
 ```
 
-
-
-
 ```{r LUT_making}
 LUT_built_form <- entries_to_factors(column_to_extract_factors_from = "BUILT_FORM")
 LUT_property_type <- entries_to_factors(column_to_extract_factors_from = "PROPERTY_TYPE")
@@ -102,4 +113,6 @@ if(F){
              file = "../Data/OS-N_EPC_v10_LUT+dictionaries.xlsx", sheetName="TRANSACTION_TYPE", append=TRUE)
 }
 ```
+
+
 

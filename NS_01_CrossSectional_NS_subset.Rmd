@@ -23,8 +23,6 @@ combi_SC_dt <- loadRData( "../Data/RData_crossSectional/_combi_SC_dt_big_crossSe
 
 
 TODO:
-
-
 # NS Censorship
 
 Exclusions:
@@ -34,6 +32,7 @@ X Age unknown
 X 100 > EE & EEI > 0 [to fit into A - E], drops 'INVALID'. Then drop either nn_CEE_rating or CURRENT_ENERGY_RATING as these are the same. 
 X Park homes, to small to count
 X NUMBER_HABITABLE_ROOMS is NA or zero (loses 2M3 entries)
+X TENURE unknown
 - remove 1% of floor area, which is 276 m2  (loses 168 792 entries)
 
 Notes:
@@ -44,40 +43,142 @@ Notes:
 ```{r}
 NS_dt <- combi_SC_dt
 
-NS_dt <- NS_dt[ !nn_construction_age_band == 'unknown']
-NS_dt <- NS_dt[ !nn_builtForm == 'unknown']
+NS_dt <- NS_dt[ !nn_construction_age_band == 'unknown']# drops = 0
+NS_dt <- NS_dt[ !nn_builtForm == 'unknown'] # drops = 2 305 479 
 
-NS_dt <- NS_dt[ CURRENT_ENERGY_EFFICIENCY > 0 ]
-NS_dt <- NS_dt[ CURRENT_ENERGY_EFFICIENCY < 101 ]
+NS_dt <- NS_dt[ CURRENT_ENERGY_EFFICIENCY > 0 ] # drops = 0
+NS_dt <- NS_dt[ CURRENT_ENERGY_EFFICIENCY < 101 ] # drops = 5
 
-NS_dt <- NS_dt[ ENVIRONMENT_IMPACT_CURRENT > 0 ]
-NS_dt <- NS_dt[ ENVIRONMENT_IMPACT_CURRENT < 101 ]
+NS_dt <- NS_dt[ ENVIRONMENT_IMPACT_CURRENT > 0 ] # drops = 0
+NS_dt <- NS_dt[ ENVIRONMENT_IMPACT_CURRENT < 101 ] # drops = 3 584 
 NS_dt[, nn_CEE_rating := NULL ]
 #drop either nn_CEE_rating or CURRENT_ENERGY_RATING as these are the same after 0< values <101
 
-NS_dt <- NS_dt[ !n_propTyp == 'Park home' ]
-NS_dt <- NS_dt[ !is.na(NUMBER_HABITABLE_ROOMS) ]
-NS_dt <- NS_dt[ !NUMBER_HABITABLE_ROOMS == 0 ]
+NS_dt <- NS_dt[ !n_propTyp == 'Park home' ] # drops = 0
+NS_dt <- NS_dt[ !is.na(NUMBER_HABITABLE_ROOMS) ] # drops = 6 876 
+NS_dt <- NS_dt[ !NUMBER_HABITABLE_ROOMS == 0 ] # drops = 215 545 
 
-maxthreshold <- round(quantile(NS_dt$TOTAL_FLOOR_AREA, 0.995, na.rm = T),0)
-maxthreshold # 99.5% = 330m2, NOTE: 99.9% = 509m2
+maxthreshold <- round(quantile(NS_dt$TOTAL_FLOOR_AREA, 0.997, na.rm = T),0)
+maxthreshold # 99.7% / 379m2, NOTE: 99.9% = 509m2 / 99.5% = 330m2
 minthreshold <- round(quantile(NS_dt$TOTAL_FLOOR_AREA, 0.0001, na.rm = T),0) 
 minthreshold # 0.01%  = 10m2
 
-NS_dt <- NS_dt[ minthreshold < NS_dt$TOTAL_FLOOR_AREA,] 
-NS_dt <- NS_dt[ maxthreshold > NS_dt$TOTAL_FLOOR_AREA,] # drops a further ~ 166 758
+NS_dt <- NS_dt[ minthreshold < NS_dt$TOTAL_FLOOR_AREA,] # drops = 2 535
+NS_dt <- NS_dt[ maxthreshold > NS_dt$TOTAL_FLOOR_AREA,] # drops = 43 541
 
 View( NS_dt[ TOTAL_FLOOR_AREA > 276 ,c('n_TOTAL_FLOOR_AREA', 'TOTAL_FLOOR_AREA'), with = F] )
 
 #save(NS_dt, file ="../Data/RData_crossSectional/_NS_dt_N14m377170.RData")
+NS_dt <- NS_dt[ !n_tenure == "unknown" ] # drops = 253 697
+```
+
+
+```{r agebands}
+#set the newest homes to be the baseline
+NS_dt <- droplevels(NS_dt)#drop unused levels, takes ages; needed for age bands below
+NS_dt[ ,nnn_construction_age_band12:= forcats::fct_rev(nnn_construction_age_band12) ]
+
+
+NS_dt[ , nnn_construction_age_band10 := nnn_construction_age_band12]
+NS_dt[ nnn_construction_age_band10 == "1983-1990"| nnn_construction_age_band10 == "1991-1995", nnn_construction_age_band10 := "1983-1995"]
+NS_dt[ nnn_construction_age_band10 == "1950-1966" | nnn_construction_age_band10 == "1967-1975", nnn_construction_age_band10 := "1950-1975"]
+NS_dt[ , nnn_construction_age_band10 := droplevels(nnn_construction_age_band10)]
+fct <- c("2012 onwards", "2007-2011", "2003-2006", "1996-2002",
+         "1983-1995",
+         "1976-1982",
+         "1950-1975",
+         "1930-1949","1900-1929","Pre-1900")
+NS_dt[,nnn_construction_age_band10 := factor(nnn_construction_age_band10, levels = fct , ordered = T)]
+
+
+
+NS_dt[ , nnn_construction_age_band9:= nnn_construction_age_band10]
+NS_dt[ nnn_construction_age_band9 == "1983-1995", nnn_construction_age_band9 := "1976-1995"]
+NS_dt[ nnn_construction_age_band9 == "1976-1982", nnn_construction_age_band9 := "1976-1995"]
+
+fct <- c("2012 onwards", "2007-2011", "2003-2006", "1996-2002",
+         "1976-1995",
+         "1950-1975",
+         "1930-1949","1900-1929","Pre-1900")
+NS_dt[,nnn_construction_age_band9 := factor(nnn_construction_age_band9, levels = fct , ordered = T)]
+```
+
+
+```{r geographies}
+#avoid confusion
+NS_dt[ ,LAD11NM:= NULL] 
+NS_dt[ ,RGN11NM:= NULL] 
+
+#Set the default region to be London
+NS_dt[ ,RGN19NM:= relevel(as.factor(RGN19NM), 'London')]
+
+#Set the default LAD to the worst perfoming one, Isles of Scilly
+#View(NS_dt[ , .(mean = mean(CURRENT_ENERGY_EFFICIENCY)), by = LAD19NM])
+#View(NS_dt[ , .(median = median(CURRENT_ENERGY_EFFICIENCY)), by = LAD19NM])
+NS_dt[ ,LAD19NM:= relevel(as.factor(LAD19NM), 'Isles of Scilly')]
 ```
 
 
 
+```{r LUT_FUEL}
+#Editing Variables should be done in the excel sheets!
+LUT_MFUEL <- read_excel("../Data/_metaData/OS-N_EPC_v10_LUT+dictionaries.xlsx", sheet = "MAIN_FUEL",range = cell_cols("B:D"))
+
+
+#MAIN FUEL
+LUT_colum <- LUT_MFUEL[match(tolower(NS_dt$MAIN_FUEL), LUT_MFUEL$MAIN_FUELfactors),"harmonisation"]
+NS_dt[,n_mFuel := LUT_colum]
+NS_dt[is.na(n_mFuel),n_mFuel := 'unspecified'] #deals with NAs
+NS_dt[ ,n_mFuel:= relevel(as.factor(n_mFuel), 'mains gas')]
+
+LUT_colum <- LUT_MFUEL[match(tolower(NS_dt$MAIN_FUEL), LUT_MFUEL$MAIN_FUELfactors),"m_mFuel_community_bool"]
+NS_dt[,n_mFuel_community_bool := LUT_colum]
+NS_dt[is.na(n_mFuel_community_bool), n_mFuel_community_bool := NA ] #deals with NAs
+#View(head(NS_dt[,c('n_mFuel','MAIN_FUEL')], 300 ))
+```
 
 
 
+```{r LUT_GLAZING}
+#Editing Variables should be done in the excel sheets!
+LUT_GLAZING <- read_excel("../Data/_metaData/OS-N_EPC_v10_LUT+dictionaries.xlsx", sheet = "GLAZED_TYPE",range = cell_cols("B:C"))
 
+
+LUT_colum <- LUT_GLAZING[match(tolower(NS_dt$GLAZED_TYPE), LUT_GLAZING$GLAZED_TYPEfactors),"harmonisation"]
+NS_dt[,n_glazing := LUT_colum]
+NS_dt[is.na(n_glazing),n_glazing := 'unknown'] #deals with NAs
+
+#relevel
+fct <- c('unknown','single glazing','triple glazing','double glazing','secondary glazing')
+NS_dt[ ,n_glazing := factor(n_glazing, levels = fct, ordered = T)]
+#View(head(NS_dt[,c('n_glazing','GLAZED_TYPE')], 300 ))
+```
+
+
+
+```{r deprivation_ranks_to_percentiles}
+#"n_imdRank"  -  > "n_imdPercent"
+#‘percentage’ measure rather than the ‘rank’ measure 
+rank_names <- names(NS_dt)[grep('Rank',names(NS_dt))]
+percent_names <- gsub('Rank', 'Percent', rank_names)
+NS_dt <- NS_dt[ , (percent_names):= lapply(.SD, function(x) rank(x)/length(x)), .SDcols = rank_names]
+```
+
+
+```{r}
+fct <- c("sale","rental","srental","new","assessment","survey")
+NS_dt[ ,nn_transactTyp  := factor(nn_transactTyp , levels = fct, ordered = T)]
+
+fct <- c("marketed sale", "non marketed sale", "rental (private)", "rental (social)", "rental","new dwelling", "ECO assessment", "assessment for green deal", "FiT application", "RHI application","following green deal", "stock condition survey", "not sale or rental", "unknown")
+NS_dt[ ,n_transactTyp  := factor(n_transactTyp , levels = fct, ordered = T)]
+```
+
+
+
+```{r}
+#metaDataCSV( NS_dt , "NS_dt_N14m152777", dir = "../Data/_metaData/CSV_") #Adds date 
+#save(NS_dt, file ="../Data/RData_crossSectional/_NS_dt_N14m152777.RData")
+```
 
 
 
