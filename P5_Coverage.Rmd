@@ -26,7 +26,8 @@ hardpath <- 'C:/Users/bonni/Dropbox/_PhD/Application Documents/CASA RA/RA OS NAR
 
 
 ABplus_subset<- read_excel("../Data/OS_data/AddressBasePlus_Header.xlsx", 
-    sheet = "Product_Classification_Scheme")
+#    sheet = "Product_Classification_Scheme")
+sheet = "Subset_Product_Class_Scheme")
 
 ABplus<- read_excel("../Data/OS_data/AddressBasePlus_Header.xlsx", 
     sheet = "samples")
@@ -48,6 +49,13 @@ datastr <- 'AddressBasePlus_FULL_2022-01-10'
 zipCSVs <- files[grepl( datastr, files, fixed = TRUE)]
 ```
 
+
+
+
+
+#Need to merge OS & ONS UPRNs
+#load_all_OS -> OS_dt_combi
+#
 
 
 ```{r load_all_OS}
@@ -148,13 +156,9 @@ OS_ONS_dt_combi <- ONS_dt_combi[OS_dt_combi, on = .(UPRN), ]
 Sys.time() - start.time
 
 
-
-save( OS_ONS_dt_combi , file = "../Outputs/WIP_crossSectional/OS_ONS_dt_combi_37M385807.RData")
+date <- format(Sys.Date(), '_%Y%m%d')
+save( OS_ONS_dt_combi , file = paste0("../Outputs/WIP_crossSectional/OS_ONS_dt_combi_37M385807",date,".RData") )
 ```
-
-
-
-
 
 
 ```{r estimating_UPRN_coverage}
@@ -183,6 +187,7 @@ for (csv in zipCSVs) {
   AB_summary_output <- rbindlist(list(AB_summary_output,tmp_output), use.names=T, fill = T)
   
 }
+
 sematic_names <- paste0(ABplus_subset$Primary_Description,':',ABplus_subset$Class_Description )
 AB_summary_output <- setNames(AB_summary_output,
                                                 nm = c("ADMIN_AREA","WARD_CODE", sematic_names,'otherClasses') )
@@ -192,11 +197,13 @@ AB_summary_output <- setNames(AB_summary_output,
  totals_AB_summary_output <- AB_summary_output[,!"WARD_CODE"][, lapply(.SD,sum), by='ADMIN_AREA']
  
  totals <- colSums(AB_summary_output[,3:34])
- write.csv(totals ,  '../Outputs/OS_data_coverage_summary.csv' ) 
- write.csv(totals_AB_summary_output ,  '../Outputs/OS_data_coverage_summary_by_AdminArea.csv' )
+ 
+ date <- format(Sys.Date(), '_%Y%m%d')
+ write.csv(totals ,  paste0("../Outputs/OS_data_coverage_summary",date,".csv" ) )
+ write.csv(totals_AB_summary_output ,  paste0("../Outputs/OS_data_coverage_summary_by_AdminArea",date,".csv" ) )
 
  
-Sys.time() - start.time
+Sys.time() - start.time # Time difference of 5.068149 mins
 ```
 
 

@@ -17,7 +17,6 @@ library(readr)
 #library(gridExtra)
 
 source("../Outputs/Thesis_custom_scripts.R", local = knitr::knit_global())
-
 combi_SC_dt <- loadRData( "../Data/RData_crossSectional/_combi_SC_dt_big_crossSect_EPCs_cleaned_N16m984358.RData")
 ```
 
@@ -115,7 +114,7 @@ NS_dt[ ,RGN19NM:= relevel(as.factor(RGN19NM), 'London')]
 #Set the default LAD to the worst perfoming one, Isles of Scilly
 #View(NS_dt[ , .(mean = mean(CURRENT_ENERGY_EFFICIENCY)), by = LAD19NM])
 #View(NS_dt[ , .(median = median(CURRENT_ENERGY_EFFICIENCY)), by = LAD19NM])
-NS_dt[ ,LAD19NM:= relevel(as.factor(LAD19NM), 'Isles of Scilly')]
+NS_dt[ ,LAD19NM:= relevel(as.factor(LAD19NM), 'Tower Hamlets')]
 ```
 
 
@@ -128,13 +127,19 @@ LUT_MFUEL <- read_excel("../Data/_metaData/OS-N_EPC_v10_LUT+dictionaries.xlsx", 
 #MAIN FUEL
 LUT_colum <- LUT_MFUEL[match(tolower(NS_dt$MAIN_FUEL), LUT_MFUEL$MAIN_FUELfactors),"harmonisation"]
 NS_dt[,n_mFuel := LUT_colum]
-NS_dt[is.na(n_mFuel),n_mFuel := 'unspecified'] #deals with NAs
+NS_dt[is.na(n_mFuel), n_mFuel := 'unspecified'] #deals with NAs
 NS_dt[ ,n_mFuel:= relevel(as.factor(n_mFuel), 'mains gas')]
 
 LUT_colum <- LUT_MFUEL[match(tolower(NS_dt$MAIN_FUEL), LUT_MFUEL$MAIN_FUELfactors),"m_mFuel_community_bool"]
 NS_dt[,n_mFuel_community_bool := LUT_colum]
 NS_dt[is.na(n_mFuel_community_bool), n_mFuel_community_bool := NA ] #deals with NAs
-#View(head(NS_dt[,c('n_mFuel','MAIN_FUEL')], 300 ))
+
+#Simplified Fuel 
+NS_dt[,nn_mFuel9 := n_mFuel]
+NS_dt[nn_mFuel9 == 'fBlend' , nn_mFuel9 := 'oil']
+
+
+#View(head(NS_dt[,c('n_mFuel','nn_mFuel9','MAIN_FUEL','n_mFuel_community_bool')], 300 ))
 ```
 
 
@@ -156,9 +161,13 @@ NS_dt[ ,n_glazing := factor(n_glazing, levels = fct, ordered = T)]
 
 
 
+
+
+
 ```{r deprivation_ranks_to_percentiles}
 #"n_imdRank"  -  > "n_imdPercent"
 #‘percentage’ measure rather than the ‘rank’ measure 
+#'IoDPercent_'
 rank_names <- names(NS_dt)[grep('Rank',names(NS_dt))]
 percent_names <- gsub('Rank', 'Percent', rank_names)
 NS_dt <- NS_dt[ , (percent_names):= lapply(.SD, function(x) rank(x)/length(x)), .SDcols = rank_names]
@@ -176,8 +185,9 @@ NS_dt[ ,n_transactTyp  := factor(n_transactTyp , levels = fct, ordered = T)]
 
 
 ```{r}
+date <- format(Sys.Date(), '_%Y%m%d')
 #metaDataCSV( NS_dt , "NS_dt_N14m152777", dir = "../Data/_metaData/CSV_") #Adds date 
-#save(NS_dt, file ="../Data/RData_crossSectional/_NS_dt_N14m152777.RData")
+save(NS_dt, file ="../Data/RData_crossSectional/_NS_dt_N14m152777.RData")
 ```
 
 

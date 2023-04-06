@@ -335,10 +335,14 @@ combi_SC_dt[ , n_imd_grp := cut(n_imdDecil,
                             include.lowest= TRUE, labels=c('Deprived.1-3','Average.4-7','M.Affluent.8-10'))]
 
 
+
+
+
+
 #c. Employment Deprivation Domain
 imd2019col <-  income_imd2019lsoa_E[ `Indices of Deprivation` == "c. Employment Deprivation Domain",]
 imd2019col <-dcast(imd2019col, lsoa11cd ~ Measurement, value.var = c("Value"))
-combi_SC_dt[imd2019col,  on = 'lsoa11cd', c('n_imdRank','n_cIoDDecil_employ') := .(Rank,Decile)]
+combi_SC_dt[imd2019col,  on = 'lsoa11cd', c('n_cIoDRank_employ','n_cIoDDecil_employ') := .(Rank,Decile)]
 #Make barriers deprivation groups
 combi_SC_dt[ , n_IoDDecil_employ_grp := cut(n_cIoDDecil_employ,
                             breaks = c(0, 3, 7, Inf),
@@ -348,7 +352,7 @@ combi_SC_dt[ , n_IoDDecil_employ_grp := cut(n_cIoDDecil_employ,
 #d. Education, Skills and Training Domain
 imd2019col <-  income_imd2019lsoa_E[ `Indices of Deprivation` == "d. Education, Skills and Training Domain",]
 imd2019col <-dcast(imd2019col, lsoa11cd ~ Measurement, value.var = c("Value"))
-combi_SC_dt[imd2019col,  on = 'lsoa11cd', c('n_imdRank','n_dIoDDecil_edu') := .(Rank,Decile)]
+combi_SC_dt[imd2019col,  on = 'lsoa11cd', c('n_dIoDRank_ed','n_dIoDDecil_edu') := .(Rank,Decile)]
 #Make barriers deprivation groups
 combi_SC_dt[ , n_IoDDecil_edu_grp := cut(n_dIoDDecil_edu,
                             breaks = c(0, 3, 7, Inf),
@@ -358,7 +362,8 @@ combi_SC_dt[ , n_IoDDecil_edu_grp := cut(n_dIoDDecil_edu,
 
 imd2019col <-  income_imd2019lsoa_E[ `Indices of Deprivation` == "h. Living Environment Deprivation Domain",]
 imd2019col <-dcast(imd2019col, lsoa11cd ~ Measurement, value.var = c("Value"))
-combi_SC_dt[imd2019col,  on = 'lsoa11cd', c('n_imdRank','n_hIoDDecil_livEnv') := .(Rank,Decile)]
+combi_SC_dt[imd2019col,  on = 'lsoa11cd', c('n_hIoDRank_livEnv','n_hIoDDecil_livEnv') := .(Rank,Decile)]
+
 #Make barriers deprivation groups
 combi_SC_dt[ , n_IoDDecil_livEnv_grp := cut(n_hIoDDecil_livEnv,
                             breaks = c(0, 3, 7, Inf),
@@ -367,7 +372,7 @@ combi_SC_dt[ , n_IoDDecil_livEnv_grp := cut(n_hIoDDecil_livEnv,
 
 imd2019col <-  income_imd2019lsoa_E[ `Indices of Deprivation` == "e. Health Deprivation and Disability Domain",]
 imd2019col <-dcast(imd2019col, lsoa11cd ~ Measurement, value.var = c("Value"))
-combi_SC_dt[imd2019col,  on = 'lsoa11cd', c('n_imdRank','n_eIoDDecil_health') := .(Rank,Decile)]
+combi_SC_dt[imd2019col,  on = 'lsoa11cd', c('n_eIoDRank_health','n_eIoDDecil_health') := .(Rank,Decile)]
 #Make barriers deprivation groups
 combi_SC_dt[ , n_IoDDecil_health_grp := cut(n_eIoDDecil_health,
                             breaks = c(0, 3, 7, Inf),
@@ -376,7 +381,7 @@ combi_SC_dt[ , n_IoDDecil_health_grp := cut(n_eIoDDecil_health,
 
 imd2019col <-  income_imd2019lsoa_E[ `Indices of Deprivation` == "f. Crime Domain",]
 imd2019col <-dcast(imd2019col, lsoa11cd ~ Measurement, value.var = c("Value"))
-combi_SC_dt[imd2019col,  on = 'lsoa11cd', c('n_imdRank','n_fIoDDecil_crime') := .(Rank,Decile)]
+combi_SC_dt[imd2019col,  on = 'lsoa11cd', c('n_fIoDRank_crime','n_fIoDDecil_crime') := .(Rank,Decile)]
 #Make barriers deprivation groups
 combi_SC_dt[ , n_IoDDecil_crime_grp := cut(n_fIoDDecil_crime,
                             breaks = c(0, 3, 7, Inf),
@@ -405,7 +410,7 @@ combi_SC_dt[,x_simp_nn_builtFormXn_propTyp := factor(x_simp_nn_builtFormXn_propT
 
 #NOTE faster: DT[, setattr(Species, "levels", c("set", "ver", "vir"))]
 combi_SC_dt[,simp_nn_construction_age_band := nn_construction_age_band]
-fct <- c("Pre-1900","Early Interwar","Near WW2","Post WW2","Mid60s-90s","Mid60s-90s","Mid60s-90s","Post 1990s","Post 1990s","Post 1990s","Post GFC","unknown")
+fct <- c("Pre-1900","Early Interwar","Near WW2","Post WW2","Mid60s-90s","Mid60s-90s","Mid60s-90s","Post 1990s","Pos=t 1990s","Post 1990s","Post GFC","unknown")
 levels(combi_SC_dt$simp_nn_construction_age_band) <- fct
 combi_SC_dt[,simp_nn_construction_age_band := factor(simp_nn_construction_age_band, levels = unique(fct), ordered = T)]
 #View(combi_SC_dt[, .(n = .N) ,by=c('nn_construction_age_band','simp_nn_construction_age_band') ])
@@ -509,19 +514,18 @@ lad_rgn_2019 <- as.data.table(read_csv("../Data/_shapefiles/lad19cd-rgn19nm/m_la
 setkey(lad_rgn_2019, m_EPC_lad19cd)
 setkey(combi_SC_dt, m_EPC_lad19cd)
 combi_SC_dt <- lad_rgn_2019[combi_SC_dt, on = 'm_EPC_lad19cd',]
-
-
 ```
 
 
 
 #End
-
 ```{r}
-#
-save(combi_SC_dt, file ="../Data/RData_crossSectional/_combi_SC_dt_big_crossSect_EPCs_cleaned_N16m984358.RData")
+#Note:   sum(is.na(combi_SC_dt$lsoa11cd)) # 690407 //  sum(is.na(combi_SC_dt$n_eIoDDecil_health)) # 1534228
+#save(combi_SC_dt, file ="../Data/RData_crossSectional/_combi_SC_dt_big_crossSect_EPCs_cleaned_N16m984358.RData")
+
+date <- format(Sys.Date(), '%Y_%m%d')
 #Adds date #
-metaDataCSV( combi_SC_dt , "combi_SC_dt_N16m984358", dir = "../Data/_metaData/CSV_")
+metaDataCSV( combi_SC_dt , paste("combi_SC_dt_N16m984358_", date) , dir = "../Data/_metaData/CSV_")
 
 #combi_SC_dt <- loadRData("../Data/RData_crossSectional/_combi_SC_dt_big_crossSect_EPCs_cleaned_N16m984358.RData")
 ```
@@ -538,7 +542,7 @@ out$sample2 <- t(combi_SC_dt[2,])
 out$sample3 <- t(combi_SC_dt[3,])
 
 
-date <- format(Sys.Date(), '%Y_%m%d')
+
 write.csv(out, file =paste0("../Data/RData_crossSectional/combi_SC_dt_cols_",date,".csv") )  
 ```
 
