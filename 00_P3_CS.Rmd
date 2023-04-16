@@ -190,7 +190,7 @@ fct <- c('Flat','House','Bungalow','Park home')
 combi_SC_dt[,n_propTyp := factor(n_propTyp, levels = fct, ordered = T)]
 ```
 
-```{r}
+```{r LUT_TRANSACTION_TYPE}
 LUT_TRANSACTION_TYPE <- read_excel("../Data/_metaData/OS-N_EPC_v10_LUT+dictionaries.xlsx", sheet = "TRANSACTION_TYPE",range = cell_cols("B:E"))
 
 #TRANSACTION_TYPE
@@ -474,7 +474,7 @@ combi_SC_dt[ , EXTENSION_COUNT:= as.numeric(EXTENSION_COUNT), ]
 ```
 
 
-```{r climatic_Regions}
+```{r SAP_climatic_Regions}
 #SAP Climatic Regions - move to 00_P3
 climatic <- as.data.table(read_csv("../Data/m_SAP_climatic_May_2020_combined.csv"))
 climatic$lad19cd <- climatic$lad20cd 
@@ -484,7 +484,9 @@ combi_SC_dt[climatic,  on = 'lad19cd', SAP_climate_grp := SAP_climat]
 combi_SC_dt[ , SAP_version := year(INSPECTION_DATE)]
 #contains some INSPECTION_DATE nas
 combi_SC_dt[ , SAP_version := ifelse(SAP_version < 2005 , 'SAP05', ifelse(SAP_version < 2009, 'SAP09', 'SAP12'))]
+```
 
+```{r Adjust Age}
 #Adjust Age
 #possibly remove nn_construction_age_band
 combi_SC_dt[ , inspection_yr := year(INSPECTION_DATE)]
@@ -515,8 +517,89 @@ setkey(lad_rgn_2019, m_EPC_lad19cd)
 setkey(combi_SC_dt, m_EPC_lad19cd)
 combi_SC_dt <- lad_rgn_2019[combi_SC_dt, on = 'm_EPC_lad19cd',]
 ```
+```{r _LUT_GLAZING}
+#Editing Variables should be done in the excel sheets!
+LUT_GLAZING <- read_excel("../Data/_metaData/OS-N_EPC_v10_LUT+dictionaries.xlsx", sheet = "GLAZED_TYPE",range = cell_cols("B:C"))
+
+LUT_colum <- LUT_GLAZING[match(tolower(NS_dt$GLAZED_TYPE), LUT_GLAZING$GLAZED_TYPEfactors),"harmonisation"]
+NS_dt[,n_glazing := LUT_colum]
+NS_dt[is.na(n_glazing),n_glazing := 'unknown'] #deals with NAs
+
+#relevel
+fct <- c('unknown','single glazing','triple glazing','double glazing','secondary glazing')
+NS_dt[ ,n_glazing := factor(n_glazing, levels = fct, ordered = T)]
+#View(head(NS_dt[,c('n_glazing','GLAZED_TYPE')], 300 ))
+```
+
+```{r nn_transactTyp}
+fct <- c("sale","rental","srental","new","assessment","survey")
+NS_dt[ ,nn_transactTyp  := factor(nn_transactTyp , levels = fct, ordered = T)]
+
+fct <- c("marketed sale", "non marketed sale", "rental (private)", "rental (social)", "rental","new dwelling", "ECO assessment", "assessment for green deal", "FiT application", "RHI application","following green deal", "stock condition survey", "not sale or rental", "unknown")
+NS_dt[ ,n_transactTyp  := factor(n_transactTyp , levels = fct, ordered = T)]
+```
+
+```{r LUT_FUEL}
+#Editing Variables should be done in the excel sheets!
+LUT_MFUEL <- read_excel("../Data/_metaData/OS-N_EPC_v10_LUT+dictionaries.xlsx", sheet = "MAIN_FUEL",range = cell_cols("B:D"))
 
 
+#MAIN FUEL
+LUT_colum <- LUT_MFUEL[match(tolower(NS_dt$MAIN_FUEL), LUT_MFUEL$MAIN_FUELfactors),"harmonisation"]
+NS_dt[,n_mFuel := LUT_colum]
+NS_dt[is.na(n_mFuel), n_mFuel := 'unspecified'] #deals with NAs
+NS_dt[ ,n_mFuel:= relevel(as.factor(n_mFuel), 'mains gas')]
+
+LUT_colum <- LUT_MFUEL[match(tolower(NS_dt$MAIN_FUEL), LUT_MFUEL$MAIN_FUELfactors),"m_mFuel_community_bool"]
+NS_dt[,n_mFuel_community_bool := LUT_colum]
+NS_dt[is.na(n_mFuel_community_bool), n_mFuel_community_bool := NA ] #deals with NAs
+
+#Simplified Fuel 
+NS_dt[,nn_mFuel9 := n_mFuel]
+NS_dt[nn_mFuel9 == 'fBlend' , nn_mFuel9 := 'oil']
+
+
+#View(head(NS_dt[,c('n_mFuel','nn_mFuel9','MAIN_FUEL','n_mFuel_community_bool')], 300 ))
+```
+
+```{r deprivation_ranks_to_percentiles}
+#"n_imdRank"  -  > "n_imdPercent"
+#‘percentage’ measure rather than the ‘rank’ measure 
+#'IoDPercent_'
+rank_names <- names(NS_dt)[grep('Rank',names(NS_dt))]
+percent_names <- gsub('Rank', 'Percent', rank_names)
+NS_dt <- NS_dt[ , (percent_names):= lapply(.SD, function(x) rank(x)/length(x)), .SDcols = rank_names]
+```
+
+```{r agebands}
+#set the newest homes to be the baseline
+NS_dt <- droplevels(NS_dt)#drop unused levels, takes ages; needed for age bands below
+NS_dt[ ,nnn_construction_age_band12:= forcats::fct_rev(nnn_construction_age_band12) ]
+
+
+NS_dt[ , nnn_construction_age_band10 := nnn_construction_age_band12]
+NS_dt[ nnn_construction_age_band10 == "1983-1990"| nnn_construction_age_band10 == "1991-1995", nnn_construction_age_band10 := "1983-1995"]
+NS_dt[ nnn_construction_age_band10 == "1950-1966" | nnn_construction_age_band10 == "1967-1975", nnn_construction_age_band10 := "1950-1975"]
+NS_dt[ , nnn_construction_age_band10 := droplevels(nnn_construction_age_band10)]
+fct <- c("2012 onwards", "2007-2011", "2003-2006", "1996-2002",
+         "1983-1995",
+         "1976-1982",
+         "1950-1975",
+         "1930-1949","1900-1929","Pre-1900")
+NS_dt[,nnn_construction_age_band10 := factor(nnn_construction_age_band10, levels = fct , ordered = T)]
+
+
+
+NS_dt[ , nnn_construction_age_band9:= nnn_construction_age_band10]
+NS_dt[ nnn_construction_age_band9 == "1983-1995", nnn_construction_age_band9 := "1976-1995"]
+NS_dt[ nnn_construction_age_band9 == "1976-1982", nnn_construction_age_band9 := "1976-1995"]
+
+fct <- c("2012 onwards", "2007-2011", "2003-2006", "1996-2002",
+         "1976-1995",
+         "1950-1975",
+         "1930-1949","1900-1929","Pre-1900")
+NS_dt[,nnn_construction_age_band9 := factor(nnn_construction_age_band9, levels = fct , ordered = T)]
+```
 
 #End
 ```{r}

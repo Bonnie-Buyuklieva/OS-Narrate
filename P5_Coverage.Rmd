@@ -22,8 +22,8 @@ loadRData <- function(fileName){
 }
 
 EDA_cols <- read_csv("../Data/EDA_colour_scheme.csv")
-hardpath <- 'C:/Users/bonni/Dropbox/_PhD/Application Documents/CASA RA/RA OS NARRATE CASA'
 
+source( '.personal_setup.R')
 
 ABplus_subset<- read_excel("../Data/OS_data/AddressBasePlus_Header.xlsx", 
 #    sheet = "Product_Classification_Scheme")
